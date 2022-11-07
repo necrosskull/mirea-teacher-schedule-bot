@@ -5,7 +5,7 @@
 
 Проект написан на языке `Python` с использованием библиотеки `pyTelegramBotAPI.`
 
-Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-schedule), который предоставляет расписание в формате `JSON.
+Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-schedule), который предоставляет расписание в формате `JSON.`
 
 Бот находится в стадии активной разработки, поэтому возможны ошибки и недоработки.
 ***
