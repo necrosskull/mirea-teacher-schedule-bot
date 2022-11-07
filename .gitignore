@@ -156,3 +156,4 @@ cython_debug/
 .idea/misc.xml
 .idea/inspectionProfiles/Project_Default.xml
 config.py
+.idea/vcs.xml
