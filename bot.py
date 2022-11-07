@@ -44,21 +44,23 @@ def get_name(message):
 
 def get_day(message):
     global day
-    day = message.text
+    day = message.text.lower()
 
-    if day == 'пн' or day == 'Пн' or day == 'понедельник' or day == 'Понедельник' or day == '1':
+    if day in ['понедельник']:
         day = '1'
-    elif day == 'вт' or day == 'Вт' or day == 'вторник' or day == 'Вторник' or day == '2':
+    elif day in ['вторник']:
         day = '2'
-    elif day == 'ср' or day == 'Ср' or day == 'среда' or day == 'Среда' or day == '3':
+    elif day in ['среда']:
         day = '3'
-    elif day == 'чт' or day == 'Чт' or day == 'четверг' or day == 'Четверг' or day == '4':
+    elif day in ['четверг']:
         day = '4'
-    elif day == 'пт' or day == 'Пт' or day == 'пятница' or day == 'Пятница' or day == '5':
+    elif day in ['пятница']:
         day = '5'
-    elif day == 'сб' or day == 'Сб' or day == 'суббота' or day == 'Суббота' or day == '6':
+    elif day in ['суббота']:
         day = '6'
-    elif day == 'назад' or day == 'Назад':
+    elif day in ['воскресенье']:
+        day = '7'
+    elif day == 'Назад':
         return bot.send_message(message.chat.id, 'Введите фамилию преподавателя',reply_markup = types.ReplyKeyboardRemove())
     else:
         bot.reply_to(message, 'Неверный ввод',reply_markup = types.ReplyKeyboardRemove())
