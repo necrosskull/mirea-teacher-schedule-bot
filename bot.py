@@ -11,7 +11,6 @@ def start_message(message):
 @bot.message_handler(content_types=['text'])
 
 
-
 def get_name(message):
     global teacher
     teacher = message.text
@@ -39,8 +38,6 @@ def get_name(message):
 
     bot.send_message(message.chat.id, 'Выберите день недели', reply_markup=markup)
 
-    # убрать клавиатуру
-
 
 
     bot.register_next_step_handler(message, get_day)
@@ -66,8 +63,7 @@ def get_day(message):
     else:
         bot.reply_to(message, 'Неверный ввод',reply_markup = types.ReplyKeyboardRemove())
         return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
-
-        # reply кнопки с неделями 1 - 17
+    
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
     item1 = types.KeyboardButton("1")
     item2 = types.KeyboardButton("2")
@@ -94,8 +90,6 @@ def get_day(message):
     bot.send_message(message.chat.id, 'Выберите неделю', reply_markup=markup)
 
 
-
-
     bot.register_next_step_handler(message, get_week)
 
 
@@ -108,10 +102,6 @@ def get_week(message):
     if weeknum.isdigit() == False:
         bot.reply_to(message, 'Номер недели должен быть числом')
         return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
-
-    # убрать клавиатуру
-
-
 
     url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
     response = requests.get(url)
@@ -225,7 +215,3 @@ def get_week(message):
 
 
 bot.polling()
-
-#gitignore
-
-
