@@ -60,7 +60,7 @@ async def get_name(message: aiogram.types.Message) -> None:
 
 @dp.callback_query_handler(state=StatesGroup.day)
 async def get_day(message: aiogram.types.CallbackQuery, state: FSMContext) -> None:
-    message.answer('Вы выбрали'+message.callback_query.data)
+    message.answer('Вы выбрали' + message.callback_query.data)
     global day
     day = aiogram.types.CallbackQuery.data.lower()
     print(day)
