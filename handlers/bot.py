@@ -1,6 +1,6 @@
 import aiogram
 import requests
-from configs import config
+import config
 from inline import inline_buttons
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher.filters.state import State, StatesGroup
