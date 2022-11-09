@@ -1,25 +1,14 @@
-# Телеграм бот с расписанием преподователей РТУ МИРЭА
- [![BOT - LINK](https://img.shields.io/static/v1?label=BOT&message=LINK&color=229ed9&style=for-the-badge)](https://t.me/teacherschedulertu_bot)
+# MIREA schedule telegram bot
+## Installing and running:
 
-## О проекте:
-Проект представляет собой бота для телеграма, который позволяет получать расписание `преподавателей РТУ МИРЭА.`
+    git clone https://github.com/V4kodin/mirea-teacher-schedule-bot
+    python -m venv env
+    env/Scripts/Activate.ps1
+    pip install -r requirements.txt
+create config.py like:
 
-Проект написан на языке `Python` с использованием библиотеки `pyTelegramBotAPI.`
+    TOKEN = 'your token'
 
-Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-schedule), который предоставляет расписание в формате `JSON.`
+start bot:
 
-Бот находится в стадии активной разработки, поэтому возможны ошибки и недоработки.
-***
-## Установка:
-Для работы бота необходимо установить следующие библиотеки:
-
- * `pyTelegramBotAPI`
- * `requests`
-
-Или установить их с помощью файла `requirements.txt`
-
-Создать файл  `config.py` и вставить в него следующий код:
-
-    token = 'Ваш токен'
-
-
+    python main.py
