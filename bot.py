@@ -1,50 +1,46 @@
-import telebot
+import logging
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, ConversationHandler
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 import requests
-from telebot import types
 import config
-bot = telebot.TeleBot(config.token)
+updater = Updater(config.token, use_context=True)
+dispatcher = updater.dispatcher
 
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',level=logging.INFO)
 
-@bot.message_handler(content_types=['text'])
+GETNAME, GETDAY, GETWEEK = range(3)
 
+def start(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Введиите фамилию преподавателя")
 
-def get_name(message):
+def get_name(update: Update, context: CallbackContext):
     global teacher
-    teacher = message.text
+    teacher = update.message.text
+
     if len(teacher) < 4:
-        bot.reply_to(message, 'Фамилия слишком короткая')
-        return
+        update.message.reply_text('Фамилия должна быть больше 3 символов')
+        return GETNAME
+
     url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
     response = requests.get(url)
     teacher_schedule = response.json() if response.status_code == 200 else None
 
-
     if teacher_schedule is None:
-        bot.reply_to(message, 'Преподаватель не найден')
-        return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
+        update.message.reply_text('Преподаватель не найден')
+        update.message.reply_text('Попробуйте еще раз')
+        return GETNAME
 
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    item1 = types.KeyboardButton("Понедельник")
-    item2 = types.KeyboardButton("Вторник")
-    item3 = types.KeyboardButton("Среда")
-    item4 = types.KeyboardButton("Четверг")
-    item5 = types.KeyboardButton("Пятница")
-    item6 = types.KeyboardButton("Суббота")
-    item7 = types.KeyboardButton("Назад")
-    markup.add(item1, item2, item3, item4, item5, item6 ,item7)
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Введите день недели", reply_markup=ReplyKeyboardMarkup(
+        [['Понедельник', 'Вторник'], ['Среда', 'Четверг'], ['Пятница', 'Суббота'], ['Назад']], resize_keyboard=True, one_time_keyboard=True))
+    return GETDAY
 
-    bot.send_message(message.chat.id, 'Выберите день недели', reply_markup=markup)
-
-
-
-    bot.register_next_step_handler(message, get_day)
-
-def get_day(message):
+def get_day(update: Update, context: CallbackContext):
     global day
-    day = message.text.lower()
+    day = update.message.text.lower()
+
+    if day == 'назад':
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя", reply_markup=ReplyKeyboardRemove())
+        return GETNAME
 
     if day in ['понедельник']:
         day = '1'
@@ -60,55 +56,29 @@ def get_day(message):
         day = '6'
     elif day in ['воскресенье']:
         day = '7'
-    elif day == 'Назад':
-        return bot.send_message(message.chat.id, 'Введите фамилию преподавателя',reply_markup = types.ReplyKeyboardRemove())
-    else:
-        bot.reply_to(message, 'Неверный ввод',reply_markup = types.ReplyKeyboardRemove())
-        return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
-    
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
-    item1 = types.KeyboardButton("1")
-    item2 = types.KeyboardButton("2")
-    item3 = types.KeyboardButton("3")
-    item4 = types.KeyboardButton("4")
-    item5 = types.KeyboardButton("5")
-    item6 = types.KeyboardButton("6")
-    item7 = types.KeyboardButton("7")
-    item8 = types.KeyboardButton("8")
-    item9 = types.KeyboardButton("9")
-    item10 = types.KeyboardButton("10")
-    item11 = types.KeyboardButton("11")
-    item12 = types.KeyboardButton("12")
-    item13 = types.KeyboardButton("13")
-    item14 = types.KeyboardButton("14")
-    item15 = types.KeyboardButton("15")
-    item16 = types.KeyboardButton("16")
-    item17 = types.KeyboardButton("17")
-    item18 = types.KeyboardButton("Отмена")
 
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Выберите неделю", reply_markup=ReplyKeyboardMarkup(
+        [['1', '2', '3','4'], ['5', '6', '7','8'], ['9', '10', '11','12'],['13', '14', '15','16','17'] , ['Назад']], resize_keyboard=True, one_time_keyboard=True))
 
-    markup.add(item1, item2, item3, item4, item5, item6, item7, item8, item9, item10, item11, item12, item13, item14, item15, item16 ,item17 ,item18)
+    return GETWEEK
 
-    bot.send_message(message.chat.id, 'Выберите неделю', reply_markup=markup)
-
-
-    bot.register_next_step_handler(message, get_week)
-
-
-
-def get_week(message):
+def get_week(update: Update, context: CallbackContext):
     global weeknum
-    weeknum = message.text
-    if weeknum == 'отмена' or weeknum == 'Отмена':
-        return bot.send_message(message.chat.id, 'Введите фамилию преподавателя',reply_markup = types.ReplyKeyboardRemove())
+    weeknum = update.message.text.lower()
+
+    if weeknum == 'назад':
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Введите день недели",
+                                 reply_markup=ReplyKeyboardMarkup(
+                                     [['Понедельник', 'Вторник'], ['Среда', 'Четверг'], ['Пятница', 'Суббота'],
+                                      ['Назад']], resize_keyboard=True, one_time_keyboard=True))
+        return GETDAY
+
     if weeknum.isdigit() == False:
-        bot.reply_to(message, 'Номер недели должен быть числом')
-        return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
+        update.message.reply_text('Неверный ввод')
+        return context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
 
     url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
     response = requests.get(url)
-
-
     teacher_schedule = response.json() if response.status_code == 200 else None
 
     if teacher_schedule:
@@ -131,9 +101,6 @@ def get_week(message):
         teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_start"])
         teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_end"])
 
-
-
-
         remove_index = []
         for i in range(len(teacher_schedule)):
             for j in range(i + 1, len(teacher_schedule)):
@@ -154,10 +121,9 @@ def get_week(message):
         for i in sorted(remove_index, reverse=True):
             del teacher_schedule[i]
 
-
         if not teacher_schedule:
-            bot.send_message(message.from_user.id, 'В этот день у преподавателя нет пар',reply_markup = types.ReplyKeyboardRemove())
-            return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
+            update.message.reply_text('В этот день нет пар')
+            return context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
 
         i = 0
         while i < len(teacher_schedule) - 1:
@@ -166,9 +132,6 @@ def get_week(message):
                     and teacher_schedule[i]["group"] == teacher_schedule[i + 1]["group"]
                     and teacher_schedule[i]["lesson"]["time_start"]
                     == teacher_schedule[i + 1]["lesson"]["time_start"]
-
-
-
             ):
                 teacher_schedule[i]["lesson"]["weeks"] += teacher_schedule[i + 1]["lesson"][
                     "weeks"
@@ -179,9 +142,6 @@ def get_week(message):
                 teacher_schedule.pop(i + 1)
             else:
                 i += 1
-
-
-
 
         for schedule in teacher_schedule:
 
@@ -206,14 +166,28 @@ def get_week(message):
             text += f"📅 Недели: {weeks}\n"
             text += f"📆 День недели: {weekday}\n\n"
 
-
         text_len = len(text)
 
-
         for i in range(0, text_len, 4096):
-            bot.send_message(message.chat.id, text[i: i + 4096],reply_markup = types.ReplyKeyboardRemove())
+            update.message.reply_text(text[i : i + 4096], reply_markup=ReplyKeyboardRemove())
     else:
-        bot.send_message(message.chat.id, 'Такого препода нет')
+        update.message.reply_text('Преподаватель не найден')
+        return context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
+    return ConversationHandler.END
 
+conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(Filters.text, get_name)],
+    states={
+        GETNAME: [MessageHandler(Filters.text, get_name)],
+        GETDAY: [MessageHandler(Filters.text, get_day)],
+        GETWEEK: [MessageHandler(Filters.text, get_week)],
+    },
+    fallbacks=[MessageHandler(Filters.text, get_week)]
+)
 
-bot.polling()
+start_handler = CommandHandler('start', start)
+dispatcher.add_handler(start_handler)
+
+dispatcher.add_handler(conv_handler)
+
+updater.start_polling()
