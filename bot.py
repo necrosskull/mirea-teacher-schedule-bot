@@ -122,8 +122,12 @@ def get_week(update: Update, context: CallbackContext):
             del teacher_schedule[i]
 
         if not teacher_schedule:
-            update.message.reply_text('В этот день нет пар')
-            return context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
+            update.message.reply_text('В этот день нет пар', reply_markup=ReplyKeyboardRemove())
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Введите день недели",
+                                     reply_markup=ReplyKeyboardMarkup(
+                                         [['Понедельник', 'Вторник'], ['Среда', 'Четверг'], ['Пятница', 'Суббота'],
+                                          ['Назад']], resize_keyboard=True, one_time_keyboard=True))
+            return GETDAY
 
         i = 0
         while i < len(teacher_schedule) - 1:
