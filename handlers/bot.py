@@ -7,6 +7,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, CallbackQuery
+from handlers import teacher_parser
 
 bot = aiogram.Bot(token=config.TOKEN)
 storage = MemoryStorage()
@@ -16,9 +17,9 @@ dp = aiogram.Dispatcher(bot, storage=storage)
 # ToDo: resize_keyboard=True markup
 
 class StatesGroup(StatesGroup):
-    name = State()
-    day = State()
-    week = State()
+    name_S = State()
+    teacher_S = State()
+    day_S = State()
 
 
 @dp.message_handler(commands=['start'], state='*')
@@ -31,22 +32,69 @@ async def start_message(message: aiogram.types.Message):
 
 
 @dp.message_handler(lambda message: message.text not in "/start", state='*')
-async def get_name(message: aiogram.types.Message) -> None:
-    # Получение фамилии преподавателя
-    global teacher
+async def get_name(message: aiogram.types.Message, state: FSMContext) -> None:
+    await StatesGroup.name_S.set()  # set name state
+    print(f"User: {message.from_user.id} set name: {message.text}")
+    # Поиск преподавателей
+
     teacher = message.text
-    try:
-        url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
-        response = requests.get(url)
-        teacher_schedule = response.json() if response.status_code == 200 else None
-    except Exception as e:
-        print("Api exception:" + e)
-        await message.reply(text='Api упало')
-
+    # Запись в контекст пользователя
+    async with state.proxy() as data:
+        data['teacher'] = teacher
+        try:
+            url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
+            response = requests.get(url)
+            teacher_schedule = response.json() if response.status_code == 200 else None
+        except Exception as e:
+            print("Api exception:" + e)
+            await message.reply(text='Api упало')  # TODO: не вызывается
+        # Запись teacher_schedule в контекст пользователя
+        data['teacher_schedule'] = teacher_schedule
     if teacher_schedule is None:
-        await message.reply(message, 'Преподаватель не найден')
+        # Ответ на сообщение сообщения: Преподаватель не найден
+        await message.reply(text='Преподаватель не найден')
+        return
+    array_of_teachers = teacher_parser.list_of_teachers(teacher_schedule)
+    #  Запись в контекст пользователя
+    async with state.proxy() as data:
+        data["array_of_teachers"] = array_of_teachers
 
-    markup = InlineKeyboardMarkup(row_width=4)
+    # Создание inline клавиатуры с неопределенным количеством кнопок
+    markup = InlineKeyboardMarkup()
+    for i in range(len(array_of_teachers)):
+        markup.add(InlineKeyboardButton(text=array_of_teachers[i], callback_data=f"teacher_button{i}"))
+    async with state.proxy() as data:
+        data['name'] = message.text
+
+    # Отправка сообщения: Выберите преподавателя
+    await message.reply(text='Выберете нужного преподавателя', reply_markup=markup)
+
+
+@dp.callback_query_handler(
+    lambda c: c.data.startswith('teacher_button'), state=StatesGroup.name_S)
+async def select_teacher(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
+    # Remove inline keyboard
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+
+    # Interpretation of the callback data
+    async with state.proxy() as data:
+        array_of_teachers = data["array_of_teachers"]
+        # фильтрация расписания по имени преподавателя
+        teacher_schedule = data["teacher_schedule"]
+        teacher_schedule_copy = {"schedules": []}
+        for i in range(len(array_of_teachers)):
+            if i == int(callback_query.data[14:]):
+                Full_teacher_name = array_of_teachers[i]
+                for j in range(len(teacher_schedule["schedules"])):
+                    if Full_teacher_name in teacher_schedule["schedules"][j]['lesson']['teachers']:
+                        teacher_schedule_copy["schedules"].append(teacher_schedule["schedules"][j])
+                data["teacher_schedule"] = teacher_schedule_copy
+                break
+    print(
+        f"User: {callback_query.from_user.id} selected teacher: {Full_teacher_name}, count of buttons: {len(array_of_teachers)}")
+    await callback_query.message.edit_text(text=f"Вы выбрали {Full_teacher_name}")
+    # markup of day selection
+    markup = InlineKeyboardMarkup(row_width=4)  # resize_keyboard=True,
     item1 = InlineKeyboardButton("Понедельник", callback_data='Понедельник')
     item2 = InlineKeyboardButton("Вторник", callback_data='Вторник')
     item3 = InlineKeyboardButton("Среда", callback_data='Среда')
@@ -56,22 +104,24 @@ async def get_name(message: aiogram.types.Message) -> None:
     item7 = InlineKeyboardButton("Назад", callback_data='Назад')
     markup.add(item1, item2, item3, item4, item5, item6, item7)
 
+    await StatesGroup.next()  # to teacher state
     # отправка сообщения пользователю
-    await message.answer('Выберите день недели', reply_markup=markup)
-    await StatesGroup.name.set()  # to name state
+    await callback_query.message.answer('Выберите день недели', reply_markup=markup)
 
 
 @dp.callback_query_handler(
     lambda c: c.data in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Назад'],
-    state=StatesGroup.name, )
+    state=StatesGroup.teacher_S, )
 async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
-    print("get_day")
+    print(f"user {callback_query.from_user.id} selected day {callback_query.data}")
     # remove reply markup
     await callback_query.message.edit_reply_markup(reply_markup=None)
     await callback_query.message.edit_text(text=f"Вы выбрали {callback_query.data}")
-    global day
     day = callback_query.data
-    print(day)
+    # Запись в контекст пользователя
+    async with state.proxy() as data:
+        data['day'] = day
+
     if day in ['Понедельник']:
         day = '1'
     elif day in ['Вторник']:
@@ -118,10 +168,17 @@ async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext
 
 
 @dp.callback_query_handler(
-    lambda c: c.data in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', 'Отмена'],
-    state=StatesGroup.day)
+    lambda c: c.data in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17',
+                         'Отмена'],
+    state=StatesGroup.day_S)
 async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
+    print(f"user {callback_query.from_user.id} selected week {callback_query.data}")
+    # remove reply markup
     await callback_query.message.edit_reply_markup(reply_markup=None)
+    # достаем данные из контекста
+    async with state.proxy() as data:
+        day = data['day']
+    # cancel button processing
     if callback_query.data == 'Отмена':
         await callback_query.message.answer('Вы выбрали отмену')
         await StatesGroup.name.set()
@@ -130,11 +187,11 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
         return
     else:
         await callback_query.message.edit_text(text=f"Вы выбрали {callback_query.data} неделю")
-    # remove reply markup
 
-    global weeknum
     weeknum = callback_query.data
-    print(weeknum)
+    # Запись в контекст пользователя
+    async with state.proxy() as data:
+        data['weeknum'] = weeknum
     # if weeknum == 'отмена' or weeknum == 'Отмена':
     #    pass    #ToDo: Не работает
     #    return bot.send_message(message.chat.id, 'Введите фамилию преподавателя',
@@ -142,9 +199,9 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
     # if weeknum.isdigit() == False:
     #    bot.reply_to(message, 'Номер недели должен быть числом')
     #    return bot.send_message(message.chat.id, 'Введите фамилию преподавателя')
-    url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
-    response = requests.get(url)
-    teacher_schedule = response.json() if response.status_code == 200 else None
+    # вытаскиваем данные из контекста пользователя
+    async with state.proxy() as data:
+        teacher_schedule = data['teacher_schedule']
     if teacher_schedule:
         text = ""
         weekdays = {
@@ -155,8 +212,6 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
             5: "Пятница",
             6: "Суббота",
         }
-        print("day:" + day)
-        print(f"int days:{int(day)}")
         teacher_schedule = teacher_schedule["schedules"]
         teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
         teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
