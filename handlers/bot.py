@@ -30,7 +30,7 @@ async def start_message(message: aiogram.types.Message):
     await message.answer(text='Введите фамилию преподавателя', reply_markup=karb)
 
 
-@dp.message_handler(lambda message: message.text not in "/start")
+@dp.message_handler(lambda message: message.text not in "/start", state='*')
 async def get_name(message: aiogram.types.Message) -> None:
     # Получение фамилии преподавателя
     global teacher
@@ -47,13 +47,13 @@ async def get_name(message: aiogram.types.Message) -> None:
         await message.reply(message, 'Преподаватель не найден')
 
     markup = InlineKeyboardMarkup(row_width=4)
-    item1 = InlineKeyboardButton("Понедельник", callback_data='monday')
-    item2 = InlineKeyboardButton("Вторник", callback_data='tuesday')
-    item3 = InlineKeyboardButton("Среда", callback_data='wednesday')
-    item4 = InlineKeyboardButton("Четверг", callback_data='thursday')
-    item5 = InlineKeyboardButton("Пятница", callback_data='friday')
-    item6 = InlineKeyboardButton("Суббота", callback_data='saturday')
-    item7 = InlineKeyboardButton("Назад", callback_data='back')  # TODO: не работает
+    item1 = InlineKeyboardButton("Понедельник", callback_data='Понедельник')
+    item2 = InlineKeyboardButton("Вторник", callback_data='Вторник')
+    item3 = InlineKeyboardButton("Среда", callback_data='Среда')
+    item4 = InlineKeyboardButton("Четверг", callback_data='Четверг')
+    item5 = InlineKeyboardButton("Пятница", callback_data='Пятница')
+    item6 = InlineKeyboardButton("Суббота", callback_data='Суббота')
+    item7 = InlineKeyboardButton("Назад", callback_data='Назад')
     markup.add(item1, item2, item3, item4, item5, item6, item7)
 
     # отправка сообщения пользователю
@@ -61,28 +61,33 @@ async def get_name(message: aiogram.types.Message) -> None:
     await StatesGroup.name.set()  # to name state
 
 
-@dp.callback_query_handler(lambda c: c.data in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
-                           state=StatesGroup.name, )
+@dp.callback_query_handler(
+    lambda c: c.data in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Назад'],
+    state=StatesGroup.name, )
 async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
+    print("get_day")
+    # remove reply markup
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+    await callback_query.message.edit_text(text=f"Вы выбрали {callback_query.data}")
     global day
-    day = callback_query.data.lower()
-    # day = message.text.lower()
-    if day in ['monday']:
+    day = callback_query.data
+    print(day)
+    if day in ['Понедельник']:
         day = '1'
-    elif day in ['tuesday']:
+    elif day in ['Вторник']:
         day = '2'
-    elif day in ['wednesday']:
+    elif day in ['Среда']:
         day = '3'
-    elif day in ['четверг']:
+    elif day in ['Четверг']:
         day = '4'
-    elif day in ['пятница']:
+    elif day in ['Пятница']:
         day = '5'
-    elif day in ['суббота']:
+    elif day in ['Суббота']:
         day = '6'
-    elif day in ['воскресенье']:
-        day = '7'
     elif day == 'Назад':
-        return  # ToDo: Не работает
+        await callback_query.message.answer('Введите фамилию преподавателя')
+        await state.finish()
+        return
     else:
         await callback_query.message.answer('Some problems with day')
     await state.update_data(day=day)
@@ -106,17 +111,26 @@ async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext
     item15 = InlineKeyboardButton("15", callback_data='15')
     item16 = InlineKeyboardButton("16", callback_data='16')
     item17 = InlineKeyboardButton("17", callback_data='17')
-    item18 = InlineKeyboardButton("Отмена", callback_data='cancel')
+    item18 = InlineKeyboardButton("Отмена", callback_data='Отмена')
     markup.add(item1, item2, item3, item4, item5, item6, item7, item8, item9, item10, item11, item12, item13, item14,
                item15, item16, item17, item18)
     await callback_query.message.reply('Выберите неделю', reply_markup=markup)
 
 
 @dp.callback_query_handler(
-    lambda c: c.data in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17'],
+    lambda c: c.data in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', 'Отмена'],
     state=StatesGroup.day)
 async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
-    print("test")
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+    if callback_query.data == 'Отмена':
+        await callback_query.message.answer('Вы выбрали отмену')
+        await StatesGroup.name.set()
+        print(f"dat is {day}")
+        callback_query.data = day
+        return
+    else:
+        await callback_query.message.edit_text(text=f"Вы выбрали {callback_query.data} неделю")
+    # remove reply markup
 
     global weeknum
     weeknum = callback_query.data
@@ -141,6 +155,8 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
             5: "Пятница",
             6: "Суббота",
         }
+        print("day:" + day)
+        print(f"int days:{int(day)}")
         teacher_schedule = teacher_schedule["schedules"]
         teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
         teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
@@ -167,7 +183,8 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
             del teacher_schedule[i]
         if not teacher_schedule:
             await callback_query.message.answer("В этот день у преподавателя нет пар")
-            return  # ToDo: Не работает
+            await state.finish()
+            return
         i = 0
         while i < len(teacher_schedule) - 1:
             if (
@@ -207,11 +224,9 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
             text += f"📆 День недели: {weekday}\n\n"
         text_len = len(text)
         for i in range(0, text_len, 4096):
-            await bot.send_message(callback_query.message.chat.id, text[i: i + 4096],
-                             reply_markup=aiogram.types.ReplyKeyboardRemove())
+            await bot.send_message(callback_query.message.chat.id, text[i: i + 4096])
     else:
-        callback_query.message.answer(callback_query.chat.id, 'Такого препода нет')
+        await callback_query.message.answer(callback_query.message.chat.id,
+                                            'Ошибка на стороне api, преподаватель не найден')
 
-
-#a = {"id": "1970298325179707551", "from": {"id": 458745827, "is_bot": false, "first_name": "Викодин", "username": "Rise2Rice", "language_code": "ru"}, "message": {"message_id": 339, "from": {"id": 5658522582, "is_bot": true, "first_name": "XfBQMQhw", "username": "XfBQMQhw_bot"}, "chat": {"id": 458745827, "first_name": "Викодин", "username": "Rise2Rice", "type": "private"}, "date": 1668037378, "reply_to_message": {"message_id": 338, "from": {"id": 5658522582, "is_bot": true, "first_name": "XfBQMQhw", "username": "XfBQMQhw_bot"}, "chat": {"id": 458745827, "first_name": "Викодин", "username": "Rise2Rice", "type": "private"}, "date": 1668037377, "text": "Выберите день недели", "reply_markup": {"inline_keyboard": [[{"text": "Понедельник", "callback_data": "monday"}, {"text": "Вторник", "callback_data": "tuesday"}, {"text": "Среда", "callback_data": "wednesday"}, {"text": "Четверг", "callback_data": "thursday"}], [{"text": "Пятница", "callback_data": "friday"}, {"text": "Суббота", "callback_data": "saturday"}, {"text": "Назад", "callback_data": "back"}]]}}, "text": "Выберите неделю", "reply_markup": {"inline_keyboard": [[{"text": "1", "callback_data": "1"}, {"text": "2", "callback_data": "2"}, {"text": "3", "callback_data": "3"}, {"text": "4", "callback_data": "4"}], [{"text": "5", "callback_data": "5"}, {"text": "6", "callback_data": "6"}, {"text": "7", "callback_data": "7"}, {"text": "8", "callback_data": "8"}], [{"text": "9", "callback_data": "9"}, {"text": "10", "callback_data": "10"}, {"text": "11", "callback_data": "11"}, {"text": "12", "callback_data": "12"}], [{"text": "13", "callback_data": "13"}, {"text": "14", "callback_data": "14"}, {"text": "15", "callback_data": "15"}, {"text": "16", "callback_data": "16"}], [{"text": "17", "callback_data": "17"}, {"text": "Отмена", "callback_data": "cancel"}]]}}, "chat_instance": "2763289293870954486", "data": "10"}
-#b = {"message_id": 340, "from": {"id": 458745827, "is_bot": false, "first_name": "Викодин", "username": "Rise2Rice", "language_code": "ru"}, "chat": {"id": 458745827, "first_name": "Викодин", "username": "Rise2Rice", "type": "private"}, "date": 1668037495, "text": "Карпов"}
+    await state.finish()
