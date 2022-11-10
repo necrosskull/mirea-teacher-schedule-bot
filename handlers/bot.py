@@ -23,11 +23,12 @@ class StatesGroup(StatesGroup):
 
 
 @dp.message_handler(commands=['start'], state='*')
-async def start_message(message: aiogram.types.Message):
+async def start_message(message: aiogram.types.Message, state: FSMContext):
     # Отправка сообщения: Введите фамилию преподавателя
     # TODO: delete Karpow board
     buttonK = KeyboardButton('Карпов')
-    karb = ReplyKeyboardMarkup(resize_keyboard=True).add(buttonK)
+    buttonK2 = KeyboardButton('Иванов')
+    karb = ReplyKeyboardMarkup(resize_keyboard=True).add(buttonK, buttonK2)
     await message.answer(text='Введите фамилию преподавателя', reply_markup=karb)
 
 
@@ -54,13 +55,13 @@ async def get_name(message: aiogram.types.Message, state: FSMContext) -> None:
         # Ответ на сообщение сообщения: Преподаватель не найден
         await message.reply(text='Преподаватель не найден')
         return
-    array_of_teachers = teacher_parser.list_of_teachers(teacher_schedule)
+    array_of_teachers = teacher_parser.list_of_teachers(teacher_schedule, teacher)
     #  Запись в контекст пользователя
     async with state.proxy() as data:
         data["array_of_teachers"] = array_of_teachers
 
     # Создание inline клавиатуры с неопределенным количеством кнопок
-    markup = InlineKeyboardMarkup()
+    markup = InlineKeyboardMarkup(row_width=2)
     for i in range(len(array_of_teachers)):
         markup.add(InlineKeyboardButton(text=array_of_teachers[i], callback_data=f"teacher_button{i}"))
     async with state.proxy() as data:
@@ -88,13 +89,14 @@ async def select_teacher(callback_query: aiogram.types.CallbackQuery, state: FSM
                 for j in range(len(teacher_schedule["schedules"])):
                     if Full_teacher_name in teacher_schedule["schedules"][j]['lesson']['teachers']:
                         teacher_schedule_copy["schedules"].append(teacher_schedule["schedules"][j])
+                        print(teacher_schedule_copy)
                 data["teacher_schedule"] = teacher_schedule_copy
                 break
     print(
         f"User: {callback_query.from_user.id} selected teacher: {Full_teacher_name}, count of buttons: {len(array_of_teachers)}")
     await callback_query.message.edit_text(text=f"Вы выбрали {Full_teacher_name}")
     # markup of day selection
-    markup = InlineKeyboardMarkup(row_width=4)  # resize_keyboard=True,
+    markup = InlineKeyboardMarkup(row_width=4, resize_keyboard=True)
     item1 = InlineKeyboardButton("Понедельник", callback_data='Понедельник')
     item2 = InlineKeyboardButton("Вторник", callback_data='Вторник')
     item3 = InlineKeyboardButton("Среда", callback_data='Среда')
@@ -143,28 +145,13 @@ async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext
     await state.update_data(day=day)
     await StatesGroup.next()  # to day state
 
-    markup = InlineKeyboardMarkup(row_width=4)
-    item1 = InlineKeyboardButton("1", callback_data='1')
-    item2 = InlineKeyboardButton("2", callback_data='2')
-    item3 = InlineKeyboardButton("3", callback_data='3')
-    item4 = InlineKeyboardButton("4", callback_data='4')
-    item5 = InlineKeyboardButton("5", callback_data='5')
-    item6 = InlineKeyboardButton("6", callback_data='6')
-    item7 = InlineKeyboardButton("7", callback_data='7')
-    item8 = InlineKeyboardButton("8", callback_data='8')
-    item9 = InlineKeyboardButton("9", callback_data='9')
-    item10 = InlineKeyboardButton("10", callback_data='10')
-    item11 = InlineKeyboardButton("11", callback_data='11')
-    item12 = InlineKeyboardButton("12", callback_data='12')
-    item13 = InlineKeyboardButton("13", callback_data='13')
-    item14 = InlineKeyboardButton("14", callback_data='14')
-    item15 = InlineKeyboardButton("15", callback_data='15')
-    item16 = InlineKeyboardButton("16", callback_data='16')
-    item17 = InlineKeyboardButton("17", callback_data='17')
-    item18 = InlineKeyboardButton("Отмена", callback_data='Отмена')
-    markup.add(item1, item2, item3, item4, item5, item6, item7, item8, item9, item10, item11, item12, item13, item14,
-               item15, item16, item17, item18)
-    await callback_query.message.reply('Выберите неделю', reply_markup=markup)
+
+    markup = InlineKeyboardMarkup(row_width=4, resize_keyboard=True)
+    button_list = []
+    for i in range(1, 17):
+        button_list.append(InlineKeyboardButton(f"{i}", callback_data=f"{i}"))
+    markup.add(*button_list, InlineKeyboardButton("Отмена", callback_data='Отмена'))
+    await callback_query.message.answer('Выберите неделю', reply_markup=markup)
 
 
 @dp.callback_query_handler(

@@ -2,7 +2,7 @@
 #from pathlib import Path
 
 #возвращает список учителей из словаря api
-def list_of_teachers(map):
+def list_of_teachers(map, teacher):
     array = []
     for i in map['schedules']:
         teachers = i['lesson']['teachers']
@@ -11,7 +11,7 @@ def list_of_teachers(map):
                 array.append(teachers[0])
         elif len(teachers) > 1:
             for j in teachers:
-                if j not in array:
+                if j not in array and j.find(teacher) != -1:
                     array.append(j)
     unique(array)
     return array
