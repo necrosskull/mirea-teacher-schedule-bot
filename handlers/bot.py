@@ -168,9 +168,6 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
     # cancel button processing
     if callback_query.data == 'Отмена':
         await callback_query.message.answer('Вы выбрали отмену')
-        await StatesGroup.name.set()
-        print(f"dat is {day}")
-        callback_query.data = day
         return
     else:
         await callback_query.message.edit_text(text=f"Вы выбрали {callback_query.data} неделю")
