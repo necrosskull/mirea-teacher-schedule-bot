@@ -74,8 +74,13 @@ def get_week(update: Update, context: CallbackContext):
         return GETDAY
 
     if weeknum.isdigit() == False:
-        update.message.reply_text('Неверный ввод')
-        return context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
+        update.message.reply_text('Неверный ввод', reply_markup=ReplyKeyboardRemove())
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Выберите неделю",
+                                 reply_markup=ReplyKeyboardMarkup(
+                                     [['1', '2', '3', '4'], ['5', '6', '7', '8'], ['9', '10', '11', '12'],
+                                      ['13', '14', '15', '16', '17'], ['Назад']], resize_keyboard=True,
+                                     one_time_keyboard=True))
+        return GETWEEK
 
     url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher}"
     response = requests.get(url)
