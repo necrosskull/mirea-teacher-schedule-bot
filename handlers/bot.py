@@ -35,7 +35,7 @@ async def start_message(message: aiogram.types.Message, state: FSMContext):
 @dp.message_handler(lambda message: message.text not in "/start", state='*')
 async def get_name(message: aiogram.types.Message, state: FSMContext) -> None:
     await StatesGroup.name_S.set()  # set name state
-    print(f"User: {message.from_user.id} set name: {message.text}")
+    print(f"User:{message.from_user.id} set name: {message.text}")
     # Поиск преподавателей
 
     teacher = message.text
@@ -93,7 +93,7 @@ async def select_teacher(callback_query: aiogram.types.CallbackQuery, state: FSM
                 data["teacher_schedule"] = teacher_schedule_copy
                 break
     print(
-        f"User: {callback_query.from_user.id} selected teacher: {Full_teacher_name}, count of buttons: {len(array_of_teachers)}")
+        f"User:{callback_query.from_user.id} selected teacher: {Full_teacher_name}, count of buttons: {len(array_of_teachers)}")
     await callback_query.message.edit_text(text=f"Вы выбрали {Full_teacher_name}")
     # markup of day selection
     markup = InlineKeyboardMarkup(row_width=4, resize_keyboard=True)
@@ -115,8 +115,7 @@ async def select_teacher(callback_query: aiogram.types.CallbackQuery, state: FSM
     lambda c: c.data in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Назад'],
     state=StatesGroup.teacher_S, )
 async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
-    print(f"user {callback_query.from_user.id} selected day {callback_query.data}")
-    # remove reply markup
+    print(f"User:{callback_query.from_user.id} selected day {callback_query.data}")
     await callback_query.message.edit_reply_markup(reply_markup=None)
     await callback_query.message.edit_text(text=f"Вы выбрали {callback_query.data}")
     day = callback_query.data
@@ -124,6 +123,7 @@ async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext
     async with state.proxy() as data:
         data['day'] = day
 
+    #TODO: изменить на case
     if day in ['Понедельник']:
         day = '1'
     elif day in ['Вторник']:
@@ -159,7 +159,7 @@ async def get_day(callback_query: aiogram.types.CallbackQuery, state: FSMContext
                          'Отмена'],
     state=StatesGroup.day_S)
 async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContext) -> None:
-    print(f"user {callback_query.from_user.id} selected week {callback_query.data}")
+    print(f"user:{callback_query.from_user.id} selected week {callback_query.data}")
     # remove reply markup
     await callback_query.message.edit_reply_markup(reply_markup=None)
     # достаем данные из контекста
