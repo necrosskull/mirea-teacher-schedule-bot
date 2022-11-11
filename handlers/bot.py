@@ -186,7 +186,7 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
     # вытаскиваем данные из контекста пользователя
     async with state.proxy() as data:
         teacher_schedule = data['teacher_schedule']
-    if teacher_schedule:
+
         text = ""
         weekdays = {
             1: "Понедельник",
@@ -264,8 +264,5 @@ async def get_week(callback_query: aiogram.types.CallbackQuery, state: FSMContex
         text_len = len(text)
         for i in range(0, text_len, 4096):
             await bot.send_message(callback_query.message.chat.id, text[i: i + 4096])
-    else:
-        await callback_query.message.answer(callback_query.message.chat.id,
-                                            'Ошибка на стороне api, преподаватель не найден')
 
     await state.finish()
