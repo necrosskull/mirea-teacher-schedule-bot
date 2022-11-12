@@ -258,8 +258,6 @@ def format_outputs(schedules):
 
 
 def for_telegram(text, update: Update):
-    """Функция для отправки сообщения блоками по 8 строк. Необходимо, чтобы избежать ошибки отправки большого
-    сообщения"""
     text_len = len(text)
 
     for i in range(0, text_len, 4096):
