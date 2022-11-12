@@ -1,9 +1,9 @@
 import logging
 import config
 import requests
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (CallbackContext, CommandHandler, ConversationHandler,
-                          Filters, MessageHandler, Updater)
+                          Filters, MessageHandler, Updater, CallbackQueryHandler)
 
 TELEGRAM_TOKEN = config.token
 
@@ -25,28 +25,62 @@ WEEKDAYS = {
     6: "Суббота",
 }
 
-WEEKDAYS_KEYBOARD_MARKUP = ReplyKeyboardMarkup(
+WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
     [
-        ["Понедельник", "Вторник"],
-        ["Среда", "Четверг"],
-        ["Пятница", "Суббота"],
-        ["Назад"],
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True,
+        [
+            InlineKeyboardButton(WEEKDAYS[1], callback_data="понедельник"),
+            InlineKeyboardButton(WEEKDAYS[2], callback_data="вторник"),
+            InlineKeyboardButton(WEEKDAYS[3], callback_data="среда"),
+        ],
+        [
+            InlineKeyboardButton(WEEKDAYS[4], callback_data="четверг"),
+            InlineKeyboardButton(WEEKDAYS[5], callback_data="пятница"),
+            InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
+
+
+        ],
+        [InlineKeyboardButton("Назад", callback_data="back"),],
+    ]
 )
 
-WEEKS_KEYBOARD_MARKUP = ReplyKeyboardMarkup(
+WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
     [
-        ["1", "2", "3", "4"],
-        ["5", "6", "7", "8"],
-        ["9", "10", "11", "12"],
-        ["13", "14", "15", "16", "17"],
-        ["Назад"],
+        [
+            InlineKeyboardButton("1", callback_data="1"),
+            InlineKeyboardButton("2", callback_data="2"),
+            InlineKeyboardButton("3", callback_data="3"),
+            InlineKeyboardButton("4", callback_data="4"),
+        ],
+        [
+            InlineKeyboardButton("5", callback_data="5"),
+            InlineKeyboardButton("6", callback_data="6"),
+            InlineKeyboardButton("7", callback_data="7"),
+            InlineKeyboardButton("8", callback_data="8"),
+        ],
+        [
+            InlineKeyboardButton("9", callback_data="9"),
+            InlineKeyboardButton("10", callback_data="10"),
+            InlineKeyboardButton("11", callback_data="11"),
+            InlineKeyboardButton("12", callback_data="12"),
+        ],
+        [
+            InlineKeyboardButton("13", callback_data="13"),
+            InlineKeyboardButton("14", callback_data="14"),
+            InlineKeyboardButton("15", callback_data="15"),
+            InlineKeyboardButton("16", callback_data="16"),
+
+        ],
+        [InlineKeyboardButton("17", callback_data="17"),
+
     ],
-    resize_keyboard=True,
-    one_time_keyboard=True,
+
+        [InlineKeyboardButton("Назад", callback_data="back"),],
+    ]
 )
+
+
+
+
 
 
 def fetch_schedule_by_name(teacher_name):
@@ -97,16 +131,15 @@ def get_name(update: Update, context: CallbackContext) -> int:
 
 
 def get_day(update: Update, context: CallbackContext):
-    day = update.message.text.lower()
-
+    day = update.callback_query.data
+    query = update.callback_query
     for key, value in WEEKDAYS.items():
         if day == value.lower():
             # Устанавливаем день недели в контексте
             context.user_data["day"] = key
 
             # Отправляем клавиатуру с выбором номера недели
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
+            query.edit_message_text(
                 text="Выберите неделю",
                 reply_markup=WEEKS_KEYBOARD_MARKUP,
             )
@@ -114,7 +147,7 @@ def get_day(update: Update, context: CallbackContext):
             # Устанавливаем состояние в GETWEEK (ожидание ввода номера недели)
             return GETWEEK
 
-    if day == "назад":
+    if day == "back":
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Введите фамилию преподавателя",
@@ -125,17 +158,17 @@ def get_day(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Неверный ввод",
-            reply_markup=ReplyKeyboardRemove(),
+
         )
         return GETDAY
 
 
 def get_week(update: Update, context: CallbackContext):
-    week_number = update.message.text.lower()
+    week_number = update.callback_query.data
+    query = update.callback_query
+    if week_number == "back":
+        query.edit_message_text(
 
-    if week_number == "назад":
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
             text="Введите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
         )
@@ -209,12 +242,10 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
 
 def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackContext):
     if not teacher_schedule:
-        update.message.reply_text(
-            "В этот день нет пар", reply_markup=ReplyKeyboardRemove()
-        )
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Введите день недели",
+        query = update.callback_query
+
+        query.edit_message_text(
+            text="В этот день нет пар \n\nВведите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
         )
         return False
@@ -259,9 +290,9 @@ def format_outputs(schedules):
 
 def for_telegram(text, update: Update):
     text_len = len(text)
-
+    query = update.callback_query
     for i in range(0, text_len, 4096):
-        update.message.reply_text(text[i: i + 4096], reply_markup=ReplyKeyboardRemove())
+        query.edit_message_text(text[i: i + 4096])
     return ConversationHandler.END
 
 
@@ -273,8 +304,10 @@ def main():
         ],
         states={
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
-            GETDAY: [MessageHandler(Filters.text, get_day, run_async=True)],
-            GETWEEK: [MessageHandler(Filters.text, get_week, run_async=True)],
+            GETDAY: [MessageHandler(Filters.text, get_day, run_async=True),
+                     CallbackQueryHandler(get_day, run_async=True)],
+            GETWEEK: [MessageHandler(Filters.text, get_week, run_async=True),
+                      CallbackQueryHandler(get_week, run_async=True)],
         },
         fallbacks=[MessageHandler(Filters.text, start, run_async=True)],
     )
@@ -282,6 +315,7 @@ def main():
     dispatcher.add_handler(conv_handler)
 
     updater.start_polling()
+
 
 
 if __name__ == "__main__":
