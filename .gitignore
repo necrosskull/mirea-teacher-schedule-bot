@@ -157,3 +157,6 @@ cython_debug/
 .idea/inspectionProfiles/Project_Default.xml
 config.py
 .idea/vcs.xml
+.idea/mirea-teacher-schedule-bot.iml
+teachers_schedule_bot.db
+.idea/encodings.xml
