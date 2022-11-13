@@ -23,7 +23,7 @@ cur.execute(
 """
 )
 
-TELEGRAM_TOKEN = "5626132769:AAEcOQu-mui4RViiv-zp2jl-foKtVQZcqs4"
+TELEGRAM_TOKEN = "YOUR_TOKEN"
 
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
@@ -32,7 +32,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-GETSETTINGS, GETNAME, GETDAY, GETWEEK, GETDATE = range(5)
+GETSETTINGS, GETNAME, GETDAY, GETWEEK, GETDATE, CONFIGURE = range(6)
 
 WEEKDAYS = {
     1: "Понедельник",
@@ -89,6 +89,16 @@ def settings_command(update: Update, context: CallbackContext):
         text="Выберите параметр для изменения",
         reply_markup=SETTINGS_COMMAND,
     )
+    return CONFIGURE
+def configure(update: Update, context: CallbackContext) -> int:
+    if update.message.text == "Настройки выбора даты":
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Выберите метод, по которому будет осуществляться поиск",
+            reply_markup=SETTINGS_MARKUP,
+        )
+    return GETSETTINGS
+
 
 
 def settings_choice(update: Update):
@@ -141,10 +151,10 @@ def settings_configure(update: Update, context: CallbackContext):
 
     elif context.user_data["settings"] == "week":
         update.message.reply_text(
-            "Введите номер недели",
-            reply_markup=WEEKS_KEYBOARD_MARKUP,
+            "Введите фамилию преподавателя",
+
         )
-        return GETWEEK
+        return GETNAME
 
     else:
         update.message.reply_text(
@@ -432,7 +442,7 @@ def format_outputs(schedules):
         text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
         text += f"🏫 Аудитории: {room}\n"
         text += f'📅 Недели: {schedule["lesson"]["weeks"]}\n'
-        text += f"📆 День недели: {weekday}\n"
+        text += f"📆 День недели: {weekday}\n\n"
 
     return text
 
@@ -462,7 +472,8 @@ def main():
                     Filters.text & ~Filters.command, settings_configure, run_async=True
                 )
             ],
-            GETDATE: [MessageHandler(Filters.text & ~Filters.command, get_date)],
+            CONFIGURE: [MessageHandler(Filters.text & ~Filters.command, configure, run_async=True)],
+            GETDATE: [MessageHandler(Filters.text & ~Filters.command, get_date, run_async=True)],
             GETNAME: [
                 MessageHandler(
                     Filters.text & ~Filters.command, get_name, run_async=True
