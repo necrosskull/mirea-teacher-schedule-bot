@@ -23,7 +23,7 @@ cur.execute(
 """
 )
 
-TELEGRAM_TOKEN = "YOUR_TOKEN"
+TELEGRAM_TOKEN = "5626132769:AAEcOQu-mui4RViiv-zp2jl-foKtVQZcqs4"
 
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
@@ -74,6 +74,34 @@ SETTINGS_MARKUP = ReplyKeyboardMarkup(
     one_time_keyboard=True,
 )
 
+SETTINGS_COMMAND = ReplyKeyboardMarkup(
+    [
+        ["Настройки выбора даты"],
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+)
+
+
+def settings_command(update: Update, context: CallbackContext):
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Выберите параметр для изменения",
+        reply_markup=SETTINGS_COMMAND,
+    )
+
+
+def settings_choice(update: Update):
+    settings_choice_message = update.message.text
+
+    if settings_choice_message == "Настойки выбора даты":
+        update.message.reply_text(
+            "Выберите метод, по которому будет осуществляться поиск",
+            reply_markup=SETTINGS_MARKUP,
+        )
+        settings_configure(update)
+
+    return GETSETTINGS
 
 def fetch_schedule_by_name(teacher_name):
     url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher_name}"
@@ -138,11 +166,7 @@ def add_settings(user_id: int, settings_type: str) -> None:
 
 
 def get_name(update: Update, context: CallbackContext) -> int:
-    teacher = update.message.text
-
-    if len(teacher) < 4:
-        update.message.reply_text("Фамилия должна быть больше 3 символов")
-        return GETNAME
+    teacher = update.message.text + " "
 
     teacher_schedule = fetch_schedule_by_name(teacher)
 
@@ -230,7 +254,6 @@ def get_date(update: Update, context: CallbackContext):
     context.user_data["date"] = date
 
     week, weekday = get_week_and_weekday(date)
-    print(week, weekday)
 
     context.user_data["week"] = week
     context.user_data["weekday"] = weekday
@@ -353,17 +376,29 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
 
 
 def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackContext):
+    user_id = update.effective_chat.id
+    cur.execute("SELECT settings FROM user_settings WHERE userid = ?", (user_id,))
+    settings = cur.fetchone()[0]
+
     if not teacher_schedule:
         update.message.reply_text(
             "В этот день нет пар", reply_markup=ReplyKeyboardRemove()
         )
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Введите день недели",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-        )
-        return False
 
+        if context.user_data["settings"] == "date":
+            update.message.reply_text(
+                "Введите дату в формате dd.mm",
+                reply_markup=ReplyKeyboardRemove(),
+            )
+            return GETDATE
+
+        elif context.user_data["settings"] == "week":
+            update.message.reply_text(
+                "Введите номер недели",
+                reply_markup=WEEKS_KEYBOARD_MARKUP,
+            )
+            return GETWEEK
+        return False
     return True
 
 
@@ -418,6 +453,7 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start, run_async=True),
+            CommandHandler("settings", settings_command, run_async=True),
             MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True),
         ],
         states={
