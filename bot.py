@@ -282,10 +282,11 @@ def get_date(update: Update, context: CallbackContext):
 
     if not is_having_schedule:
         return GETDATE
+    else:
+        text = format_outputs(parsed_schedule)
 
-    text = format_outputs(parsed_schedule)
+        return for_telegram(text, update)
 
-    return for_telegram(text, update)
 
 
 def get_day(update: Update, context: CallbackContext):
@@ -404,19 +405,20 @@ def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackCont
     cur.execute("SELECT settings FROM user_settings WHERE userid = ?", (user_id,))
     settings = cur.fetchone()[0]
 
+
     if not teacher_schedule:
         update.message.reply_text(
             "В этот день нет пар", reply_markup=ReplyKeyboardRemove()
         )
 
-        if context.user_data["settings"] == "date":
+        if settings == "date":
             update.message.reply_text(
                 "Введите дату в формате dd.mm",
                 reply_markup=ReplyKeyboardRemove(),
             )
             return GETDATE
 
-        elif context.user_data["settings"] == "week":
+        elif settings == "week":
             update.message.reply_text(
                 "Введите день недели",
                 reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
