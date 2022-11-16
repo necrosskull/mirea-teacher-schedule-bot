@@ -13,6 +13,8 @@ from telegram.ext import (
     Updater,
 )
 
+import config
+
 conn = sqlite3.connect("teachers_schedule_bot.db", check_same_thread=False)
 cur = conn.cursor()
 
@@ -23,7 +25,7 @@ cur.execute(
 """
 )
 
-TELEGRAM_TOKEN = "YOUR_TOKEN"
+TELEGRAM_TOKEN = config.token
 
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
@@ -268,10 +270,23 @@ def get_date(update: Update, context: CallbackContext):
     context.user_data["week"] = week
     context.user_data["weekday"] = weekday
 
-    update.message.reply_text(
-        "Введите имя преподавателя",
+    week = context.user_data["week"]
+    weekday = context.user_data["weekday"]
+
+    parsed_schedule = parse(context.user_data["teacher_schedule"], weekday, week)
+    parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(
+        parsed_schedule
     )
-    return GETNAME
+    parsed_schedule = merge_weeks_numbers(parsed_schedule)
+
+    is_having_schedule = have_teacher_lessons(parsed_schedule, update, context)
+
+    if not is_having_schedule:
+        return GETDATE
+
+    text = format_outputs(parsed_schedule)
+
+    return for_telegram(text, update)
 
 
 def get_day(update: Update, context: CallbackContext):
