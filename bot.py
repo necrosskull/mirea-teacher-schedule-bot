@@ -146,10 +146,9 @@ def settings_configure(update: Update, context: CallbackContext):
 
     if context.user_data["settings"] == "date":
         update.message.reply_text(
-            "Введите дату в формате dd.mm",
-            reply_markup=ReplyKeyboardRemove(),
+            "Введите фамилию преподавателя",
         )
-        return GETDATE
+        return GETNAME
 
     elif context.user_data["settings"] == "week":
         update.message.reply_text(
