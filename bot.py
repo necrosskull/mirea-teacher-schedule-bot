@@ -419,10 +419,10 @@ def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackCont
 
         elif context.user_data["settings"] == "week":
             update.message.reply_text(
-                "Введите номер недели",
-                reply_markup=WEEKS_KEYBOARD_MARKUP,
+                "Введите день недели",
+                reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
             )
-            return GETWEEK
+            return GETDAY
         return False
     return True
 
