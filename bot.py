@@ -284,7 +284,8 @@ def get_date(update: Update, context: CallbackContext):
         return GETDATE
     else:
         text = format_outputs(parsed_schedule)
-
+        del context.user_data["week"]
+        del context.user_data["weekday"]
         return for_telegram(text, update)
 
 
