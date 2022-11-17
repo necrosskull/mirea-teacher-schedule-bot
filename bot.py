@@ -410,21 +410,18 @@ def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackCont
     if not teacher_schedule:
         update.message.reply_text(
             "В этот день нет пар", reply_markup=ReplyKeyboardRemove()
-        )
-
+           )
         if settings == "date":
             update.message.reply_text(
                 "Введите дату в формате dd.mm",
                 reply_markup=ReplyKeyboardRemove(),
             )
-            return GETDATE
 
         elif settings == "week":
             update.message.reply_text(
                 "Введите день недели",
                 reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
             )
-            return GETDAY
         return False
     return True
 
