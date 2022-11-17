@@ -319,7 +319,7 @@ def get_day(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Неверный ввод",
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
         )
         return GETDAY
 
