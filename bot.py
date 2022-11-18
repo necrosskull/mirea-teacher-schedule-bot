@@ -1,29 +1,9 @@
-import datetime
 import logging
-import sqlite3
-
-import requests
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.ext import (
-    CallbackContext,
-    CommandHandler,
-    ConversationHandler,
-    Filters,
-    MessageHandler,
-    Updater,
-)
-
 import config
-
-conn = sqlite3.connect("teachers_schedule_bot.db", check_same_thread=False)
-cur = conn.cursor()
-
-cur.execute(
-    """CREATE TABLE IF NOT EXISTS user_settings(
-   userid INT PRIMARY KEY,
-   settings TEXT);
-"""
-)
+import requests
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (CallbackContext, CommandHandler, ConversationHandler,
+                          Filters, MessageHandler, Updater, CallbackQueryHandler)
 
 TELEGRAM_TOKEN = config.token
 
@@ -34,7 +14,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-GETSETTINGS, GETNAME, GETDAY, GETWEEK, GETDATE, CONFIGURE = range(6)
+GETNAME, GETDAY, GETWEEK = range(3)
 
 WEEKDAYS = {
     1: "Понедельник",
@@ -45,75 +25,63 @@ WEEKDAYS = {
     6: "Суббота",
 }
 
-WEEKDAYS_KEYBOARD_MARKUP = ReplyKeyboardMarkup(
+WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
     [
-        ["Понедельник", "Вторник"],
-        ["Среда", "Четверг"],
-        ["Пятница", "Суббота"],
-        ["Назад"],
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True,
+        [
+            InlineKeyboardButton(WEEKDAYS[1], callback_data="понедельник"),
+            InlineKeyboardButton(WEEKDAYS[2], callback_data="вторник"),
+            InlineKeyboardButton(WEEKDAYS[3], callback_data="среда"),
+        ],
+        [
+            InlineKeyboardButton(WEEKDAYS[4], callback_data="четверг"),
+            InlineKeyboardButton(WEEKDAYS[5], callback_data="пятница"),
+            InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
+
+
+        ],
+        [InlineKeyboardButton("Назад", callback_data="back"),],
+    ]
 )
 
-WEEKS_KEYBOARD_MARKUP = ReplyKeyboardMarkup(
+WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
     [
-        ["1", "2", "3", "4"],
-        ["5", "6", "7", "8"],
-        ["9", "10", "11", "12"],
-        ["13", "14", "15", "16", "17"],
-        ["Назад"],
+        [
+            InlineKeyboardButton("1", callback_data="1"),
+            InlineKeyboardButton("2", callback_data="2"),
+            InlineKeyboardButton("3", callback_data="3"),
+            InlineKeyboardButton("4", callback_data="4"),
+        ],
+        [
+            InlineKeyboardButton("5", callback_data="5"),
+            InlineKeyboardButton("6", callback_data="6"),
+            InlineKeyboardButton("7", callback_data="7"),
+            InlineKeyboardButton("8", callback_data="8"),
+        ],
+        [
+            InlineKeyboardButton("9", callback_data="9"),
+            InlineKeyboardButton("10", callback_data="10"),
+            InlineKeyboardButton("11", callback_data="11"),
+            InlineKeyboardButton("12", callback_data="12"),
+        ],
+        [
+            InlineKeyboardButton("13", callback_data="13"),
+            InlineKeyboardButton("14", callback_data="14"),
+            InlineKeyboardButton("15", callback_data="15"),
+            InlineKeyboardButton("16", callback_data="16"),
+
+        ],
+        [InlineKeyboardButton("17", callback_data="17"),
+
     ],
-    resize_keyboard=True,
-    one_time_keyboard=True,
+
+        [InlineKeyboardButton("Назад", callback_data="back"),],
+    ]
 )
 
-SETTINGS_MARKUP = ReplyKeyboardMarkup(
-    [
-        ["Дата в формате dd.mm", "Неделя с выбором дня"],
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True,
-)
-
-SETTINGS_COMMAND = ReplyKeyboardMarkup(
-    [
-        ["Настройки выбора даты"],
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True,
-)
-
-
-def settings_command(update: Update, context: CallbackContext):
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Выберите параметр для изменения",
-        reply_markup=SETTINGS_COMMAND,
-    )
-    return CONFIGURE
-def configure(update: Update, context: CallbackContext) -> int:
-    if update.message.text == "Настройки выбора даты":
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Выберите метод, по которому будет осуществляться поиск",
-            reply_markup=SETTINGS_MARKUP,
-        )
-    return GETSETTINGS
 
 
 
-def settings_choice(update: Update):
-    settings_choice_message = update.message.text
 
-    if settings_choice_message == "Настойки выбора даты":
-        update.message.reply_text(
-            "Выберите метод, по которому будет осуществляться поиск",
-            reply_markup=SETTINGS_MARKUP,
-        )
-        settings_configure(update)
-
-    return GETSETTINGS
 
 def fetch_schedule_by_name(teacher_name):
     url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher_name}"
@@ -123,61 +91,19 @@ def fetch_schedule_by_name(teacher_name):
 
 def start(update: Update, context: CallbackContext) -> int:
     context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Выберите метод, по которому будет осуществляться поиск",
-        reply_markup=SETTINGS_MARKUP,
+        chat_id=update.effective_chat.id, text="Введите фамилию преподавателя"
     )
 
-    # Переключаемся в состояние GETSETTINGS (ожидание ввода настроек)
-    return GETSETTINGS
-
-
-def settings_configure(update: Update, context: CallbackContext):
-    settings = update.message.text
-
-    if settings == "Дата в формате dd.mm":
-        context.user_data["settings"] = "date"
-    elif settings == "Неделя с выбором дня":
-        context.user_data["settings"] = "week"
-    else:
-        return GETSETTINGS
-
-    add_settings(update.message.from_user.id, context.user_data["settings"])
-
-    if context.user_data["settings"] == "date":
-        update.message.reply_text(
-            "Введите фамилию преподавателя",
-        )
-        return GETNAME
-
-    elif context.user_data["settings"] == "week":
-        update.message.reply_text(
-            "Введите фамилию преподавателя",
-
-        )
-        return GETNAME
-
-    else:
-        update.message.reply_text(
-            "Выберите метод, по которому будет осуществляться поиск",
-            reply_markup=SETTINGS_MARKUP,
-        )
-        return GETSETTINGS
-
-
-def add_settings(user_id: int, settings_type: str) -> None:
-    cur.execute(
-        "INSERT OR REPLACE INTO user_settings(userid, settings) VALUES (?, ?)",
-        (
-            user_id,
-            settings_type,
-        ),
-    )
-    conn.commit()
+    # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
+    return GETNAME
 
 
 def get_name(update: Update, context: CallbackContext) -> int:
-    teacher = update.message.text + " "
+    teacher = update.message.text
+
+    if len(teacher) < 4:
+        update.message.reply_text("Фамилия должна быть больше 3 символов")
+        return GETNAME
 
     teacher_schedule = fetch_schedule_by_name(teacher)
 
@@ -193,114 +119,27 @@ def get_name(update: Update, context: CallbackContext) -> int:
     # Устанавливаем расписание преподавателя в контексте для избежания повторных запросов
     context.user_data["teacher_schedule"] = teacher_schedule
 
-    user_id = update.effective_chat.id
-    cur.execute("SELECT settings FROM user_settings WHERE userid = ?", (user_id,))
-    settings = cur.fetchone()[0]
-
-    if settings == "date":
-        if "week" not in context.user_data or "weekday" not in context.user_data:
-            update.message.reply_text(
-                "Введите дату в формате dd.mm",
-                reply_markup=ReplyKeyboardRemove(),
-            )
-            return GETDATE
-        else:
-            week = context.user_data["week"]
-            weekday = context.user_data["weekday"]
-
-            parsed_schedule = parse(teacher_schedule, weekday, week)
-            parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(
-                parsed_schedule
-            )
-            parsed_schedule = merge_weeks_numbers(parsed_schedule)
-
-            is_having_schedule = have_teacher_lessons(parsed_schedule, update, context)
-
-            if not is_having_schedule:
-                return GETDATE
-
-            text = format_outputs(parsed_schedule)
-
-            return for_telegram(text, update)
-
-    elif settings == "week" or settings is None:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Введите день недели",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-        )
-        return GETDAY
-
-
-def get_week_and_weekday(date: datetime.date):
-    """Функция взята из
-    https://github.com/mirea-ninja/rtu-mirea-schedule/blob/287773afdd7f6a04f8349efee950fc154fcbeef7/app/core/schedule_utils.py#L7
-    """
-    now = date
-    start_date = datetime.date(date.year, 9, 1)
-
-    if now < start_date:
-        return 1, now.isoweekday()
-
-    week = now.isocalendar()[1] - start_date.isocalendar()[1]
-
-    if now.isocalendar()[2] != 0:
-        week += 1
-
-    return week, now.isoweekday()
-
-
-def get_date(update: Update, context: CallbackContext):
-    date = update.message.text
-
-    try:
-        date = datetime.datetime.strptime(date, "%d.%m")
-        date = datetime.date(datetime.datetime.now().year, date.month, date.day)
-    except ValueError:
-        update.message.reply_text(
-            "Неверный формат даты. Дата должна быть в формате dd.mm"
-        )
-        return GETDATE
-
-    context.user_data["date"] = date
-
-    week, weekday = get_week_and_weekday(date)
-
-    context.user_data["week"] = week
-    context.user_data["weekday"] = weekday
-
-    week = context.user_data["week"]
-    weekday = context.user_data["weekday"]
-
-    parsed_schedule = parse(context.user_data["teacher_schedule"], weekday, week)
-    parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(
-        parsed_schedule
+    # Отправляем клавиатуру с выбором дня недели
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Введите день недели",
+        reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
     )
-    parsed_schedule = merge_weeks_numbers(parsed_schedule)
 
-    is_having_schedule = have_teacher_lessons(parsed_schedule, update, context)
-
-    if not is_having_schedule:
-        return GETDATE
-    else:
-        text = format_outputs(parsed_schedule)
-        del context.user_data["week"]
-        del context.user_data["weekday"]
-        return for_telegram(text, update)
-
+    # Устанавливаем состояние в GETDAY (ожидание ввода дня недели)
+    return GETDAY
 
 
 def get_day(update: Update, context: CallbackContext):
-    day = update.message.text.lower()
-
+    day = update.callback_query.data
+    query = update.callback_query
     for key, value in WEEKDAYS.items():
         if day == value.lower():
             # Устанавливаем день недели в контексте
             context.user_data["day"] = key
 
             # Отправляем клавиатуру с выбором номера недели
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
+            query.edit_message_text(
                 text="Выберите неделю",
                 reply_markup=WEEKS_KEYBOARD_MARKUP,
             )
@@ -308,7 +147,7 @@ def get_day(update: Update, context: CallbackContext):
             # Устанавливаем состояние в GETWEEK (ожидание ввода номера недели)
             return GETWEEK
 
-    if day == "назад":
+    if day == "back":
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Введите фамилию преподавателя",
@@ -319,17 +158,17 @@ def get_day(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Неверный ввод",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+
         )
         return GETDAY
 
 
 def get_week(update: Update, context: CallbackContext):
-    week_number = update.message.text.lower()
+    week_number = update.callback_query.data
+    query = update.callback_query
+    if week_number == "back":
+        query.edit_message_text(
 
-    if week_number == "назад":
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
             text="Введите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
         )
@@ -384,13 +223,13 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     for i in range(len(teacher_schedule)):
         for j in range(i + 1, len(teacher_schedule)):
             if (
-                    teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
-                    and teacher_schedule[i]["lesson"]["name"]
-                    == teacher_schedule[j]["lesson"]["name"]
-                    and teacher_schedule[i]["lesson"]["weeks"]
-                    == teacher_schedule[j]["lesson"]["weeks"]
-                    and teacher_schedule[i]["lesson"]["time_start"]
-                    == teacher_schedule[j]["lesson"]["time_start"]
+                teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
+                and teacher_schedule[i]["lesson"]["name"]
+                == teacher_schedule[j]["lesson"]["name"]
+                and teacher_schedule[i]["lesson"]["weeks"]
+                == teacher_schedule[j]["lesson"]["weeks"]
+                and teacher_schedule[i]["lesson"]["time_start"]
+                == teacher_schedule[j]["lesson"]["time_start"]
             ):
                 teacher_schedule[i]["group"] += ", " + teacher_schedule[j]["group"]
                 remove_index.append(j)
@@ -402,27 +241,15 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
 
 
 def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackContext):
-    user_id = update.effective_chat.id
-    cur.execute("SELECT settings FROM user_settings WHERE userid = ?", (user_id,))
-    settings = cur.fetchone()[0]
-
-
     if not teacher_schedule:
-        update.message.reply_text(
-            "В этот день нет пар", reply_markup=ReplyKeyboardRemove()
-           )
-        if settings == "date":
-            update.message.reply_text(
-                "Введите дату в формате dd.mm",
-                reply_markup=ReplyKeyboardRemove(),
-            )
+        query = update.callback_query
 
-        elif settings == "week":
-            update.message.reply_text(
-                "Введите день недели",
-                reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-            )
+        query.edit_message_text(
+            text="В этот день нет пар \n\nВведите день недели",
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+        )
         return False
+
     return True
 
 
@@ -462,14 +289,10 @@ def format_outputs(schedules):
 
 
 def for_telegram(text, update: Update):
-    """Функция для отправки сообщения блоками по 8 строк. Необходимо, чтобы избежать ошибки отправки большого
-    сообщения"""
     text_len = len(text)
-
+    query = update.callback_query
     for i in range(0, text_len, 4096):
-        update.message.reply_text(
-            text[i: i + 4096], reply_markup=ReplyKeyboardRemove()
-        )
+        query.edit_message_text(text[i: i + 4096])
     return ConversationHandler.END
 
 
@@ -477,30 +300,14 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start, run_async=True),
-            CommandHandler("settings", settings_command, run_async=True),
             MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True),
         ],
         states={
-            GETSETTINGS: [
-                MessageHandler(
-                    Filters.text & ~Filters.command, settings_configure, run_async=True
-                )
-            ],
-            CONFIGURE: [MessageHandler(Filters.text & ~Filters.command, configure, run_async=True)],
-            GETDATE: [MessageHandler(Filters.text & ~Filters.command, get_date, run_async=True)],
-            GETNAME: [
-                MessageHandler(
-                    Filters.text & ~Filters.command, get_name, run_async=True
-                )
-            ],
-            GETDAY: [
-                MessageHandler(Filters.text & ~Filters.command, get_day, run_async=True)
-            ],
-            GETWEEK: [
-                MessageHandler(
-                    Filters.text & ~Filters.command, get_week, run_async=True
-                )
-            ],
+            GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
+            GETDAY: [MessageHandler(Filters.text, get_day, run_async=True),
+                     CallbackQueryHandler(get_day, run_async=True)],
+            GETWEEK: [MessageHandler(Filters.text, get_week, run_async=True),
+                      CallbackQueryHandler(get_week, run_async=True)],
         },
         fallbacks=[MessageHandler(Filters.text, start, run_async=True)],
     )
@@ -508,6 +315,7 @@ def main():
     dispatcher.add_handler(conv_handler)
 
     updater.start_polling()
+
 
 
 if __name__ == "__main__":
