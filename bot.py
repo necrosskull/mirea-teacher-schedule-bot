@@ -148,10 +148,8 @@ def get_day(update: Update, context: CallbackContext):
             return GETWEEK
 
     if day == "back":
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        query.edit_message_text(
             text="Введите фамилию преподавателя",
-            reply_markup=ReplyKeyboardRemove(),
         )
         return GETNAME
     else:
