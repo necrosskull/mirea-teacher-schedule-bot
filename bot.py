@@ -173,12 +173,7 @@ def get_week(update: Update, context: CallbackContext):
         return GETDAY
 
     if not week_number.strip().isdigit():
-        update.message.reply_text("Неверный ввод", reply_markup=ReplyKeyboardRemove())
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Выберите неделю",
-            reply_markup=WEEKS_KEYBOARD_MARKUP,
-        )
+        query.edit_message_text("Выберите неделю", reply_markup=WEEKS_KEYBOARD_MARKUP)
         return GETWEEK
 
     week_number = int(week_number)
@@ -302,12 +297,11 @@ def main():
         ],
         states={
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
-            GETDAY: [MessageHandler(Filters.text, get_day, run_async=True),
-                     CallbackQueryHandler(get_day, run_async=True)],
-            GETWEEK: [MessageHandler(Filters.text, get_week, run_async=True),
-                      CallbackQueryHandler(get_week, run_async=True)],
+            GETDAY: [CallbackQueryHandler(get_day, run_async=True)],
+            GETWEEK: [CallbackQueryHandler(get_week, run_async=True)],
         },
-        fallbacks=[MessageHandler(Filters.text, start, run_async=True)],
+        fallbacks=[CommandHandler("start", start, run_async=True),
+                   MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
     )
 
     dispatcher.add_handler(conv_handler)
