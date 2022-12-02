@@ -158,3 +158,4 @@ cython_debug/
 config.py
 .idea/vcs.xml
 /testinline.py
+weekcheck.py
