@@ -131,6 +131,12 @@ def get_name(update: Update, context: CallbackContext) -> int:
 
 
 def get_day(update: Update, context: CallbackContext):
+    url = f"https://schedule.mirea.ninja/api/schedule/current_week"
+    response = requests.get(url)
+    week = response.json()
+    weeknumber = week['week']
+
+
     day = update.callback_query.data
     query = update.callback_query
     for key, value in WEEKDAYS.items():
@@ -140,7 +146,7 @@ def get_day(update: Update, context: CallbackContext):
 
             # Отправляем клавиатуру с выбором номера недели
             query.edit_message_text(
-                text="Выберите неделю",
+                text="Выберите неделю\nТекущая неделя: " + str(weeknumber),
                 reply_markup=WEEKS_KEYBOARD_MARKUP,
             )
 
