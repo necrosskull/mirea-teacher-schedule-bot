@@ -1,6 +1,7 @@
 import logging
 import config
 import requests
+import datetime
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (CallbackContext, CommandHandler, ConversationHandler,
                           Filters, MessageHandler, Updater, CallbackQueryHandler)
@@ -37,50 +38,12 @@ WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
             InlineKeyboardButton(WEEKDAYS[5], callback_data="пятница"),
             InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
 
-
         ],
-        [InlineKeyboardButton("Назад", callback_data="back"),],
+        [
+            InlineKeyboardButton("Назад", callback_data="back"),
+        ],
     ]
 )
-
-WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("1", callback_data="1"),
-            InlineKeyboardButton("2", callback_data="2"),
-            InlineKeyboardButton("3", callback_data="3"),
-            InlineKeyboardButton("4", callback_data="4"),
-        ],
-        [
-            InlineKeyboardButton("5", callback_data="5"),
-            InlineKeyboardButton("6", callback_data="6"),
-            InlineKeyboardButton("7", callback_data="7"),
-            InlineKeyboardButton("8", callback_data="8"),
-        ],
-        [
-            InlineKeyboardButton("9", callback_data="9"),
-            InlineKeyboardButton("10", callback_data="10"),
-            InlineKeyboardButton("11", callback_data="11"),
-            InlineKeyboardButton("12", callback_data="12"),
-        ],
-        [
-            InlineKeyboardButton("13", callback_data="13"),
-            InlineKeyboardButton("14", callback_data="14"),
-            InlineKeyboardButton("15", callback_data="15"),
-            InlineKeyboardButton("16", callback_data="16"),
-
-        ],
-        [InlineKeyboardButton("17", callback_data="17"),
-
-    ],
-
-        [InlineKeyboardButton("Назад", callback_data="back"),],
-    ]
-)
-
-
-
-
 
 
 def fetch_schedule_by_name(teacher_name):
@@ -131,12 +94,59 @@ def get_name(update: Update, context: CallbackContext) -> int:
 
 
 def get_day(update: Update, context: CallbackContext):
-    url = f"https://schedule.mirea.ninja/api/schedule/current_week"
-    response = requests.get(url)
-    week = response.json()
-    weeknumber = week['week']
+    # easter eggs :) holidays triggers for week cursor
+    new_year = datetime.datetime(2020, 12, 31)
+    love_day = datetime.datetime(2020, 2, 14)
+    delta = datetime.timedelta(days=365)
+    today = datetime.datetime.today()
+    # new year handler
+    if abs((today - new_year) % delta).days <= 20 or abs((today - new_year) % delta).days >= 345:
 
+        s = "⁕"
+    elif abs((today - love_day) % delta).days <= 1 or abs((today - love_day) % delta).days >= 364:
+        s = "❤"
+    else:
+        s = "•"
 
+    # current week cursor handler
+    cur_week = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()["week"]
+    WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(f"{s}1{s}", callback_data="1") if cur_week == 1 else InlineKeyboardButton("1", callback_data="1"),
+                InlineKeyboardButton(f"{s}2{s}", callback_data="2") if cur_week == 2 else InlineKeyboardButton("2", callback_data="2"),
+                InlineKeyboardButton(f"{s}3{s}", callback_data="3") if cur_week == 3 else InlineKeyboardButton("3", callback_data="3"),
+                InlineKeyboardButton(f"{s}4{s}", callback_data="4") if cur_week == 4 else InlineKeyboardButton("4", callback_data="4"),
+            ],
+            [
+                InlineKeyboardButton(f"{s}5{s}", callback_data="5") if cur_week == 5 else InlineKeyboardButton("5", callback_data="5"),
+                InlineKeyboardButton(f"{s}6{s}", callback_data="6") if cur_week == 6 else InlineKeyboardButton("6", callback_data="6"),
+                InlineKeyboardButton(f"{s}7{s}", callback_data="7") if cur_week == 7 else InlineKeyboardButton("7", callback_data="7"),
+                InlineKeyboardButton(f"{s}8{s}", callback_data="8") if cur_week == 8 else InlineKeyboardButton("8", callback_data="8"),
+            ],
+            [
+                InlineKeyboardButton(f"{s}9{s}", callback_data="9") if cur_week == 9 else InlineKeyboardButton("9", callback_data="9"),
+                InlineKeyboardButton(f"{s}10{s}", callback_data="10") if cur_week == 10 else InlineKeyboardButton("10", callback_data="10"),
+                InlineKeyboardButton(f"{s}11{s}", callback_data="11") if cur_week == 11 else InlineKeyboardButton("11", callback_data="11"),
+                InlineKeyboardButton(f"{s}12{s}", callback_data="12") if cur_week == 12 else InlineKeyboardButton("12", callback_data="12"),
+            ],
+            [
+                InlineKeyboardButton(f"{s}13{s}", callback_data="13") if cur_week == 13 else InlineKeyboardButton("13", callback_data="13"),
+                InlineKeyboardButton(f"{s}14{s}", callback_data="14") if cur_week == 14 else InlineKeyboardButton("14", callback_data="14"),
+                InlineKeyboardButton(f"{s}15{s}", callback_data="15") if cur_week == 15 else InlineKeyboardButton("15", callback_data="15"),
+                InlineKeyboardButton(f"{s}16{s}", callback_data="16") if cur_week == 16 else InlineKeyboardButton("16", callback_data="16"),
+
+            ],
+            [
+                InlineKeyboardButton(f"{s}17{s}", callback_data="17") if cur_week == 17 else InlineKeyboardButton("17", callback_data="17"),
+
+            ],
+
+            [
+                InlineKeyboardButton("Назад", callback_data="back"),
+            ],
+        ]
+    )
     day = update.callback_query.data
     query = update.callback_query
     for key, value in WEEKDAYS.items():
@@ -146,7 +156,7 @@ def get_day(update: Update, context: CallbackContext):
 
             # Отправляем клавиатуру с выбором номера недели
             query.edit_message_text(
-                text="Выберите неделю\nТекущая неделя: " + str(weeknumber),
+                text="Выберите неделю\nТекущая неделя: " + str(cur_week),
                 reply_markup=WEEKS_KEYBOARD_MARKUP,
             )
 
@@ -222,13 +232,13 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     for i in range(len(teacher_schedule)):
         for j in range(i + 1, len(teacher_schedule)):
             if (
-                teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
-                and teacher_schedule[i]["lesson"]["name"]
-                == teacher_schedule[j]["lesson"]["name"]
-                and teacher_schedule[i]["lesson"]["weeks"]
-                == teacher_schedule[j]["lesson"]["weeks"]
-                and teacher_schedule[i]["lesson"]["time_start"]
-                == teacher_schedule[j]["lesson"]["time_start"]
+                    teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
+                    and teacher_schedule[i]["lesson"]["name"]
+                    == teacher_schedule[j]["lesson"]["name"]
+                    and teacher_schedule[i]["lesson"]["weeks"]
+                    == teacher_schedule[j]["lesson"]["weeks"]
+                    and teacher_schedule[i]["lesson"]["time_start"]
+                    == teacher_schedule[j]["lesson"]["time_start"]
             ):
                 teacher_schedule[i]["group"] += ", " + teacher_schedule[j]["group"]
                 remove_index.append(j)
@@ -313,7 +323,6 @@ def main():
     dispatcher.add_handler(conv_handler)
 
     updater.start_polling()
-
 
 
 if __name__ == "__main__":
