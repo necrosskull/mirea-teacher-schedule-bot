@@ -43,7 +43,19 @@ WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
     ]
 )
 
-s = "•"
+# easter eggs :) holidays triggers for week cursor
+new_year = datetime.datetime(2020, 12, 31)
+love_day = datetime.datetime(2020, 2, 14)
+delta = datetime.timedelta(days=365)
+today = datetime.datetime.today()
+#new year handler
+if abs((today-new_year)%delta) <= 20:
+
+    s = "⁕"
+elif abs((today-love_day)%delta) <= 1:
+    s = "❤"
+else:
+    s = "•"
 
 # current week cursor handler
 cur_week = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()["week"]
