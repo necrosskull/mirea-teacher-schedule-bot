@@ -109,7 +109,9 @@ def get_day(update: Update, context: CallbackContext):
         s = "•"
 
     # current week cursor handler
-    cur_week = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()["week"]
+    week = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+    cur_week = week["week"]
+    context.user_data["week"] = cur_week
     WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
         [
             [
@@ -147,6 +149,7 @@ def get_day(update: Update, context: CallbackContext):
             ],
         ]
     )
+    context.user_data["week_keyboard"] = WEEKS_KEYBOARD_MARKUP
     day = update.callback_query.data
     query = update.callback_query
     for key, value in WEEKDAYS.items():
@@ -178,6 +181,8 @@ def get_day(update: Update, context: CallbackContext):
 
 
 def get_week(update: Update, context: CallbackContext):
+    cur_week = context.user_data["week"]
+    WEEKS_KEYBOARD_MARKUP = context.user_data["week_keyboard"]
     week_number = update.callback_query.data
     query = update.callback_query
     if week_number == "back":
@@ -189,7 +194,7 @@ def get_week(update: Update, context: CallbackContext):
         return GETDAY
 
     if not week_number.strip().isdigit():
-        query.edit_message_text("Выберите неделю", reply_markup=WEEKS_KEYBOARD_MARKUP)
+        query.edit_message_text(text="Выберите неделю\nТекущая неделя: " + str(cur_week), reply_markup=WEEKS_KEYBOARD_MARKUP)
         return GETWEEK
 
     week_number = int(week_number)
