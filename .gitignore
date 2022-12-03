@@ -157,5 +157,7 @@ cython_debug/
 .idea/inspectionProfiles/Project_Default.xml
 config.py
 .idea/vcs.xml
+/testinline.py
+weekcheck.py
 
 .idea/
