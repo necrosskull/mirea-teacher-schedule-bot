@@ -159,5 +159,8 @@ config.py
 .idea/vcs.xml
 /testinline.py
 weekcheck.py
+<<<<<<< HEAD
 
 .idea/
+=======
+>>>>>>> main
