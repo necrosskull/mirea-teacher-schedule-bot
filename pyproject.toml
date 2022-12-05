@@ -11,6 +11,7 @@ packages = [{include = "mirea_teacher_schedule_bot"}]
 python = "^3.9"
 requests = "^2.28.1"
 python-telegram-bot = "^13.14"
+python-dotenv = "^0.21.0"
 
 
 [tool.poetry.dev-dependencies]
