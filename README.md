@@ -19,7 +19,7 @@
 ```bash
 poetry install
 ```
-2. Измените конфигурацию в `bot/config.py`
+2. Добавьте файл .env в корневую директорию проекта и заполните его по примеру `.env.example`
 3. Запустите приложение:
 ```bash
 poetry run python bot/main.py
