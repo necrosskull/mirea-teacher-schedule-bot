@@ -155,7 +155,6 @@ cython_debug/
 .idea/modules.xml
 .idea/misc.xml
 .idea/inspectionProfiles/Project_Default.xml
-config.py
 .idea/vcs.xml
 /testinline.py
 weekcheck.py
@@ -164,3 +163,5 @@ weekcheck.py
 .idea/
 =======
 >>>>>>> main
+bot/config.py
+bot/config.py
