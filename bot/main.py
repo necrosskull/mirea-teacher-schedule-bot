@@ -1,19 +1,23 @@
-import logging
-import config
-import requests
 import datetime
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (CallbackContext, CommandHandler, ConversationHandler,
-                          Filters, MessageHandler, Updater, CallbackQueryHandler)
+import logging
 
-TELEGRAM_TOKEN = config.token
+import requests
+from config import TELEGRAM_TOKEN
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    CallbackContext,
+    CallbackQueryHandler,
+    CommandHandler,
+    ConversationHandler,
+    Filters,
+    MessageHandler,
+    Updater,
+)
 
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 GETNAME, GETDAY, GETWEEK = range(3)
 
@@ -37,7 +41,6 @@ WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
             InlineKeyboardButton(WEEKDAYS[4], callback_data="четверг"),
             InlineKeyboardButton(WEEKDAYS[5], callback_data="пятница"),
             InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
-
         ],
         [
             InlineKeyboardButton("Назад", callback_data="back"),
@@ -53,9 +56,7 @@ def fetch_schedule_by_name(teacher_name):
 
 
 def start(update: Update, context: CallbackContext) -> int:
-    context.bot.send_message(
-        chat_id=update.effective_chat.id, text="Введите фамилию преподавателя"
-    )
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
 
     # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
     return GETNAME
@@ -115,35 +116,66 @@ def get_day(update: Update, context: CallbackContext):
     WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(f"{s}1{s}", callback_data="1") if cur_week == 1 else InlineKeyboardButton("1", callback_data="1"),
-                InlineKeyboardButton(f"{s}2{s}", callback_data="2") if cur_week == 2 else InlineKeyboardButton("2", callback_data="2"),
-                InlineKeyboardButton(f"{s}3{s}", callback_data="3") if cur_week == 3 else InlineKeyboardButton("3", callback_data="3"),
-                InlineKeyboardButton(f"{s}4{s}", callback_data="4") if cur_week == 4 else InlineKeyboardButton("4", callback_data="4"),
+                InlineKeyboardButton(f"{s}1{s}", callback_data="1")
+                if cur_week == 1
+                else InlineKeyboardButton("1", callback_data="1"),
+                InlineKeyboardButton(f"{s}2{s}", callback_data="2")
+                if cur_week == 2
+                else InlineKeyboardButton("2", callback_data="2"),
+                InlineKeyboardButton(f"{s}3{s}", callback_data="3")
+                if cur_week == 3
+                else InlineKeyboardButton("3", callback_data="3"),
+                InlineKeyboardButton(f"{s}4{s}", callback_data="4")
+                if cur_week == 4
+                else InlineKeyboardButton("4", callback_data="4"),
             ],
             [
-                InlineKeyboardButton(f"{s}5{s}", callback_data="5") if cur_week == 5 else InlineKeyboardButton("5", callback_data="5"),
-                InlineKeyboardButton(f"{s}6{s}", callback_data="6") if cur_week == 6 else InlineKeyboardButton("6", callback_data="6"),
-                InlineKeyboardButton(f"{s}7{s}", callback_data="7") if cur_week == 7 else InlineKeyboardButton("7", callback_data="7"),
-                InlineKeyboardButton(f"{s}8{s}", callback_data="8") if cur_week == 8 else InlineKeyboardButton("8", callback_data="8"),
+                InlineKeyboardButton(f"{s}5{s}", callback_data="5")
+                if cur_week == 5
+                else InlineKeyboardButton("5", callback_data="5"),
+                InlineKeyboardButton(f"{s}6{s}", callback_data="6")
+                if cur_week == 6
+                else InlineKeyboardButton("6", callback_data="6"),
+                InlineKeyboardButton(f"{s}7{s}", callback_data="7")
+                if cur_week == 7
+                else InlineKeyboardButton("7", callback_data="7"),
+                InlineKeyboardButton(f"{s}8{s}", callback_data="8")
+                if cur_week == 8
+                else InlineKeyboardButton("8", callback_data="8"),
             ],
             [
-                InlineKeyboardButton(f"{s}9{s}", callback_data="9") if cur_week == 9 else InlineKeyboardButton("9", callback_data="9"),
-                InlineKeyboardButton(f"{s}10{s}", callback_data="10") if cur_week == 10 else InlineKeyboardButton("10", callback_data="10"),
-                InlineKeyboardButton(f"{s}11{s}", callback_data="11") if cur_week == 11 else InlineKeyboardButton("11", callback_data="11"),
-                InlineKeyboardButton(f"{s}12{s}", callback_data="12") if cur_week == 12 else InlineKeyboardButton("12", callback_data="12"),
+                InlineKeyboardButton(f"{s}9{s}", callback_data="9")
+                if cur_week == 9
+                else InlineKeyboardButton("9", callback_data="9"),
+                InlineKeyboardButton(f"{s}10{s}", callback_data="10")
+                if cur_week == 10
+                else InlineKeyboardButton("10", callback_data="10"),
+                InlineKeyboardButton(f"{s}11{s}", callback_data="11")
+                if cur_week == 11
+                else InlineKeyboardButton("11", callback_data="11"),
+                InlineKeyboardButton(f"{s}12{s}", callback_data="12")
+                if cur_week == 12
+                else InlineKeyboardButton("12", callback_data="12"),
             ],
             [
-                InlineKeyboardButton(f"{s}13{s}", callback_data="13") if cur_week == 13 else InlineKeyboardButton("13", callback_data="13"),
-                InlineKeyboardButton(f"{s}14{s}", callback_data="14") if cur_week == 14 else InlineKeyboardButton("14", callback_data="14"),
-                InlineKeyboardButton(f"{s}15{s}", callback_data="15") if cur_week == 15 else InlineKeyboardButton("15", callback_data="15"),
-                InlineKeyboardButton(f"{s}16{s}", callback_data="16") if cur_week == 16 else InlineKeyboardButton("16", callback_data="16"),
-
+                InlineKeyboardButton(f"{s}13{s}", callback_data="13")
+                if cur_week == 13
+                else InlineKeyboardButton("13", callback_data="13"),
+                InlineKeyboardButton(f"{s}14{s}", callback_data="14")
+                if cur_week == 14
+                else InlineKeyboardButton("14", callback_data="14"),
+                InlineKeyboardButton(f"{s}15{s}", callback_data="15")
+                if cur_week == 15
+                else InlineKeyboardButton("15", callback_data="15"),
+                InlineKeyboardButton(f"{s}16{s}", callback_data="16")
+                if cur_week == 16
+                else InlineKeyboardButton("16", callback_data="16"),
             ],
             [
-                InlineKeyboardButton(f"{s}17{s}", callback_data="17") if cur_week == 17 else InlineKeyboardButton("17", callback_data="17"),
-
+                InlineKeyboardButton(f"{s}17{s}", callback_data="17")
+                if cur_week == 17
+                else InlineKeyboardButton("17", callback_data="17"),
             ],
-
             [
                 InlineKeyboardButton("Назад", callback_data="back"),
             ],
@@ -175,7 +207,6 @@ def get_day(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Неверный ввод",
-
         )
         return GETDAY
 
@@ -187,14 +218,15 @@ def get_week(update: Update, context: CallbackContext):
     query = update.callback_query
     if week_number == "back":
         query.edit_message_text(
-
             text="Введите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
         )
         return GETDAY
 
     if not week_number.strip().isdigit():
-        query.edit_message_text(text="Выберите неделю\nТекущая неделя: " + str(cur_week), reply_markup=WEEKS_KEYBOARD_MARKUP)
+        query.edit_message_text(
+            text="Выберите неделю\nТекущая неделя: " + str(cur_week), reply_markup=WEEKS_KEYBOARD_MARKUP
+        )
         return GETWEEK
 
     week_number = int(week_number)
@@ -220,12 +252,8 @@ def parse(teacher_schedule, weekday, week_number):
     teacher_schedule = teacher_schedule["schedules"]
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
-    teacher_schedule = list(
-        filter(lambda x: x["weekday"] == int(weekday), teacher_schedule)
-    )
-    teacher_schedule = list(
-        filter(lambda x: int(week_number) in x["lesson"]["weeks"], teacher_schedule)
-    )
+    teacher_schedule = list(filter(lambda x: x["weekday"] == int(weekday), teacher_schedule))
+    teacher_schedule = list(filter(lambda x: int(week_number) in x["lesson"]["weeks"], teacher_schedule))
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_start"])
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_end"])
 
@@ -237,13 +265,10 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     for i in range(len(teacher_schedule)):
         for j in range(i + 1, len(teacher_schedule)):
             if (
-                    teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
-                    and teacher_schedule[i]["lesson"]["name"]
-                    == teacher_schedule[j]["lesson"]["name"]
-                    and teacher_schedule[i]["lesson"]["weeks"]
-                    == teacher_schedule[j]["lesson"]["weeks"]
-                    and teacher_schedule[i]["lesson"]["time_start"]
-                    == teacher_schedule[j]["lesson"]["time_start"]
+                teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
+                and teacher_schedule[i]["lesson"]["name"] == teacher_schedule[j]["lesson"]["name"]
+                and teacher_schedule[i]["lesson"]["weeks"] == teacher_schedule[j]["lesson"]["weeks"]
+                and teacher_schedule[i]["lesson"]["time_start"] == teacher_schedule[j]["lesson"]["time_start"]
             ):
                 teacher_schedule[i]["group"] += ", " + teacher_schedule[j]["group"]
                 remove_index.append(j)
@@ -306,7 +331,7 @@ def for_telegram(text, update: Update):
     text_len = len(text)
     query = update.callback_query
     for i in range(0, text_len, 4096):
-        query.edit_message_text(text[i: i + 4096])
+        query.edit_message_text(text[i : i + 4096])
     return ConversationHandler.END
 
 
@@ -321,8 +346,10 @@ def main():
             GETDAY: [CallbackQueryHandler(get_day, run_async=True)],
             GETWEEK: [CallbackQueryHandler(get_week, run_async=True)],
         },
-        fallbacks=[CommandHandler("start", start, run_async=True),
-                   MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
+        fallbacks=[
+            CommandHandler("start", start, run_async=True),
+            MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True),
+        ],
     )
 
     dispatcher.add_handler(conv_handler)
