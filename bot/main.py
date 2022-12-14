@@ -103,9 +103,9 @@ def get_day(update: Update, context: CallbackContext):
     # new year handler
     if abs((today - new_year) % delta).days <= 20 or abs((today - new_year) % delta).days >= 345:
 
-        s = "⁕"
+        s = "❄️"
     elif abs((today - love_day) % delta).days <= 1 or abs((today - love_day) % delta).days >= 364:
-        s = "❤"
+        s = "❤️"
     else:
         s = "•"
 
