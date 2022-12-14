@@ -34,5 +34,5 @@ docker build -t telegram_bot .
 ``` 
 
 ```bash
-docker run -e TELEGRAM_TOKEN=<TELEGRAM_TOKEN> -t telegram_bot
+docker run --restart on-failure -e TELEGRAM_TOKEN=<TELEGRAM_TOKEN> -t telegram_bot
 ```
