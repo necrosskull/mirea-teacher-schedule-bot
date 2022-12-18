@@ -89,6 +89,9 @@ def inlinequery(update: Update, context: CallbackContext):
     query = update.inline_query.query
     if not query:
         return
+    query = query.title()
+    if " " not in query:
+        query+=" "
     teacher_schedule = fetch_schedule_by_name(query)
     if teacher_schedule is None:
         return
