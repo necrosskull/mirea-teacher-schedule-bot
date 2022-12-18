@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 
 import requests
@@ -64,6 +63,13 @@ def start(update: Update, context: CallbackContext) -> int:
 
 
 def check_same_surnames(teacher_schedule, surname):
+    """
+    Проверяет имеющихся в JSON преподавателей.
+    В случае нахождения однофамильца, но сдругим именем или фамилией заносит в список surnames
+    :param teacher_schedule: JSON строка расписания
+    :param surname: Строка фильтрации, например фамилия
+    :return: surnames - лист ФИО преподавателей
+    """
     surnames = []
     schedules = teacher_schedule["schedules"]
     for schedule in schedules:
@@ -76,6 +82,12 @@ def check_same_surnames(teacher_schedule, surname):
     return surnames
 
 def teacher_clarify(update: Update, context:CallbackContext)->int:
+    """
+    Обработчик нажатия кнопки с ФИО преподавателя
+    :param update: объект из telegram.update
+    :param context: контекст callback события
+    :return: код дальнейшего шага (GETDAY || GETNAME)
+    """
     chosed_teacher = update.callback_query.data
     query = update.callback_query
     if chosed_teacher=="back":
@@ -90,6 +102,10 @@ def teacher_clarify(update: Update, context:CallbackContext)->int:
 
 
 def prepare_teacher_markup(teachers):
+    """
+    Конструирует клавиатуру доступных преподавателей однофамильцев
+    :param teachers: лист преподавателей
+    """
     btns = []
     for teacher in teachers:
         btns = btns + [[InlineKeyboardButton(teacher, callback_data=teacher)]]
