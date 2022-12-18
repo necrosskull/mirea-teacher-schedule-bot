@@ -100,6 +100,7 @@ def inlinequery(update: Update, context: CallbackContext):
         results.append(
             InlineQueryResultArticle(
                 id=uuid4(),
+                description="Расписание преподавателя",
                 title=surname,
                 input_message_content=InputTextMessageContent(surname),
             )
