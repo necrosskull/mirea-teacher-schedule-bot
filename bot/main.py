@@ -19,7 +19,7 @@ dispatcher = updater.dispatcher
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-GETNAME, GETDAY, GETWEEK = range(3)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY = range(4)
 
 WEEKDAYS = {
     1: "Понедельник",
@@ -62,26 +62,95 @@ def start(update: Update, context: CallbackContext) -> int:
     return GETNAME
 
 
+def check_same_surnames(teacher_schedule, surname):
+    """
+    Проверяет имеющихся в JSON преподавателей.
+    В случае нахождения однофамильца, но сдругим именем или фамилией заносит в список surnames
+    :param teacher_schedule: JSON строка расписания
+    :param surname: Строка фильтрации, например фамилия
+    :return: surnames - лист ФИО преподавателей
+    """
+    surnames = []
+    schedules = teacher_schedule["schedules"]
+    for schedule in schedules:
+        teachers = schedule["lesson"]["teachers"]
+        for teacher in teachers:
+            truncated = str(teacher).replace(" ",'')
+            truncated_surname = surname.replace(' ','')
+            if truncated not in str(surnames).replace(' ','') and truncated_surname in truncated:
+                surnames.append(teacher)
+    return surnames
+
+def teacher_clarify(update: Update, context:CallbackContext)->int:
+    """
+    Обработчик нажатия кнопки с ФИО преподавателя
+    :param update: объект из telegram.update
+    :param context: контекст callback события
+    :return: код дальнейшего шага (GETDAY || GETNAME)
+    """
+    chosed_teacher = update.callback_query.data
+    query = update.callback_query
+    if chosed_teacher=="back":
+        query.edit_message_text("Введите фамилию преподавателя")
+        return GETNAME
+    context.user_data["teacher"]=chosed_teacher.split('.')[0]
+    query.edit_message_text(
+        text="Выберите день недели",
+        reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+    )
+    return GETDAY
+
+
+def prepare_teacher_markup(teachers):
+    """
+    Конструирует клавиатуру доступных преподавателей однофамильцев
+    :param teachers: лист преподавателей
+    """
+    btns = []
+    for teacher in teachers:
+        btns = btns + [[InlineKeyboardButton(teacher, callback_data=teacher)]]
+    btns= btns + [[(InlineKeyboardButton("Назад", callback_data="back"))]]
+    TEACHER_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
+    return TEACHER_CLARIFY_MARKUP
+
+
 def get_name(update: Update, context: CallbackContext) -> int:
     teacher = update.message.text
-
-    if len(teacher) < 4:
-        update.message.reply_text("Фамилия должна быть больше 3 символов")
-        return GETNAME
-
+    teacher = teacher.title()
+    if " " not in teacher:
+        teacher+=" "
+    # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
     teacher_schedule = fetch_schedule_by_name(teacher)
 
     if teacher_schedule is None:
         update.message.reply_text("Преподаватель не найден\nПопробуйте еще раз")
         return GETNAME
 
+    context.user_data["teacher_schedule"] = teacher_schedule
+
+    # Определяем наличие однофамильцев, при их наличии предоставляем выбор
+    # иначе сохраняем в контексте фамилию преподавателя.
+    # `user_data` - это словарь, который можно использовать для хранения любых данных.
+    # Для каждого обновления от одного и того же пользователя он будет одинаковым.
+    context.user_data["available_teachers"] = check_same_surnames(teacher_schedule,teacher)
+    if len(context.user_data["available_teachers"])>1:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Выберите преподавателя",
+            reply_markup=prepare_teacher_markup(context.user_data["available_teachers"]),
+        )
+        return TEACHER_CLARIFY
+    elif len(context.user_data["available_teachers"])==0:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Ошибка при определении ФИО. Повторите ввод изменив запрос, например введя фамилию вместо ФИО"
+        )
+        return GETNAME
+    else:
+        context.user_data["teacher"]=context.user_data["available_teachers"][0]
     # Устанавливаем фамилию преподавателя в контексте.
     # `user_data` - это словарь, который можно использовать для хранения любых данных.
     # Для каждого обновления от одного и того же пользователя он будет одинаковым.
-    context.user_data["teacher"] = teacher
-
-    # Устанавливаем расписание преподавателя в контексте для избежания повторных запросов
-    context.user_data["teacher_schedule"] = teacher_schedule
 
     # Отправляем клавиатуру с выбором дня недели
     context.bot.send_message(
@@ -232,8 +301,9 @@ def get_week(update: Update, context: CallbackContext):
     week_number = int(week_number)
     weekday = context.user_data["day"]
     schedule_data = context.user_data["teacher_schedule"]
+    teacher_surname = context.user_data["teacher"]
 
-    parsed_schedule = parse(schedule_data, weekday, week_number)
+    parsed_schedule = parse(schedule_data, weekday, week_number, teacher_surname)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
 
@@ -248,8 +318,9 @@ def get_week(update: Update, context: CallbackContext):
     return for_telegram(text, update)
 
 
-def parse(teacher_schedule, weekday, week_number):
+def parse(teacher_schedule, weekday, week_number, teacher):
     teacher_schedule = teacher_schedule["schedules"]
+    teacher_schedule = list(filter(lambda x: teacher in str(x["lesson"]["teachers"]), teacher_schedule))
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
     teacher_schedule = list(filter(lambda x: x["weekday"] == int(weekday), teacher_schedule))
@@ -345,6 +416,7 @@ def main():
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
             GETDAY: [CallbackQueryHandler(get_day, run_async=True)],
             GETWEEK: [CallbackQueryHandler(get_week, run_async=True)],
+            TEACHER_CLARIFY: [CallbackQueryHandler(teacher_clarify, run_async=True)]
         },
         fallbacks=[
             CommandHandler("start", start, run_async=True),
