@@ -1,9 +1,9 @@
 import datetime
 import logging
-
+from uuid import uuid4
 import requests
 from config import TELEGRAM_TOKEN
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -12,6 +12,7 @@ from telegram.ext import (
     Filters,
     MessageHandler,
     Updater,
+    InlineQueryHandler,
 )
 
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
@@ -80,6 +81,30 @@ def check_same_surnames(teacher_schedule, surname):
             if truncated not in str(surnames).replace(' ','') and truncated_surname in truncated:
                 surnames.append(teacher)
     return surnames
+def inlinequery(update: Update, context: CallbackContext):
+    """
+    Обработчик инлайн запросов
+    Возвращает список преподавателей
+    """
+    query = update.inline_query.query
+    if not query:
+        return
+    teacher_schedule = fetch_schedule_by_name(query)
+    if teacher_schedule is None:
+        return
+    surnames = check_same_surnames(teacher_schedule, query)
+    if len(surnames) == 0:
+        return
+    results = []
+    for surname in surnames:
+        results.append(
+            InlineQueryResultArticle(
+                id=uuid4(),
+                title=surname,
+                input_message_content=InputTextMessageContent(surname),
+            )
+        )
+    update.inline_query.answer(results)
 
 def teacher_clarify(update: Update, context:CallbackContext)->int:
     """
@@ -425,7 +450,7 @@ def main():
     )
 
     dispatcher.add_handler(conv_handler)
-
+    dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
     updater.start_polling()
 
 
