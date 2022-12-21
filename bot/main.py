@@ -3,7 +3,7 @@ import logging
 from uuid import uuid4
 import requests
 from InlineStep import EInlineStep
-from bot import ImportantDays
+import ImportantDays
 from config import TELEGRAM_TOKEN
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import (
