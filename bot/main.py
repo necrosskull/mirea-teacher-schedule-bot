@@ -2,6 +2,7 @@ import datetime
 import logging
 from uuid import uuid4
 import requests
+from InlineStep import EInlineStep
 from config import TELEGRAM_TOKEN
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import (
@@ -13,8 +14,8 @@ from telegram.ext import (
     MessageHandler,
     Updater,
     InlineQueryHandler,
+ChosenInlineResultHandler
 )
-
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
@@ -84,7 +85,7 @@ def check_same_surnames(teacher_schedule, surname):
 def inlinequery(update: Update, context: CallbackContext):
     """
     Обработчик инлайн запросов
-    Возвращает список преподавателей
+    Создает Inline отображение
     """
     query = update.inline_query.query
     if not query:
@@ -98,17 +99,66 @@ def inlinequery(update: Update, context: CallbackContext):
     surnames = check_same_surnames(teacher_schedule, query)
     if len(surnames) == 0:
         return
-    results = []
+    inline_results = []
+    userid = str(update.inline_query.from_user.id)
     for surname in surnames:
-        results.append(
-            InlineQueryResultArticle(
-                id=uuid4(),
-                description="Расписание преподавателя",
-                title=surname,
-                input_message_content=InputTextMessageContent(surname),
-            )
-        )
-    update.inline_query.answer(results)
+        inline_results.append(InlineQueryResultArticle(
+            id = surname,
+            title=surname,
+            description="Нажми, чтобы посмотреть расписание",
+            input_message_content=InputTextMessageContent(
+                message_text=f"Выбран преподаватель: {surname}!"
+            ),
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP
+
+        ))
+    update.inline_query.answer(inline_results,cache_time=10,is_personal=True)
+
+def answer_inline_handler(update: Update, context:CallbackContext):
+    """
+    В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
+    и выставляет текущий шаг Inline запроса на ask_day
+    """
+    if update.chosen_inline_result is not None:
+        context.user_data["teacher"] = update.chosen_inline_result.result_id
+        context.user_data["inline_step"] =EInlineStep.ask_day
+        return
+
+def inline_dispatcher(update: Update, context: CallbackContext):
+    """
+    Обработка вызовов в чатах на основании Callback вызова
+    """
+    if "inline_step" not in context.user_data:
+        deny_inline_usage(update)
+        return
+    status = context.user_data["inline_step"]
+    if status==EInlineStep.completed or status==EInlineStep.ask_teacher:
+        deny_inline_usage(update)
+        return
+    print(update.callback_query)
+    if status==EInlineStep.ask_day:
+        context.user_data["teacher_schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+        target = get_day(update,context)
+        if (target!=GETNAME):
+            context.user_data["inline_step"]=EInlineStep.ask_week
+        else:
+            update.callback_query.edit_message_text("Вызовите бота снова, указав нужного преподавателя")
+            context.user_data["inline_step"]=EInlineStep.ask_teacher
+        return
+    if status==EInlineStep.ask_week:
+        target = get_week(update,context)
+        if target==GETDAY:
+            context.user_data["inline_step"]=EInlineStep.ask_day
+        elif target != GETWEEK:
+            context.user_data["inline_step"]=EInlineStep.completed
+        return
+
+def deny_inline_usage(update: Update):
+    """
+    Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
+    """
+    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. его вызвал другой человек",show_alert=True)
+    return
 
 def teacher_clarify(update: Update, context:CallbackContext)->int:
     """
@@ -292,7 +342,6 @@ def get_day(update: Update, context: CallbackContext):
                 text="Выберите неделю\nТекущая неделя: " + str(cur_week),
                 reply_markup=WEEKS_KEYBOARD_MARKUP,
             )
-
             # Устанавливаем состояние в GETWEEK (ожидание ввода номера недели)
             return GETWEEK
 
@@ -302,8 +351,7 @@ def get_day(update: Update, context: CallbackContext):
         )
         return GETNAME
     else:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        query.edit_message_text(
             text="Неверный ввод",
         )
         return GETDAY
@@ -455,6 +503,8 @@ def main():
 
     dispatcher.add_handler(conv_handler)
     dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
+    dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
+    dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
     updater.start_polling()
 
 
