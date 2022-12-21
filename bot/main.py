@@ -3,6 +3,7 @@ import logging
 from uuid import uuid4
 import requests
 from InlineStep import EInlineStep
+from bot import ImportantDays
 from config import TELEGRAM_TOKEN
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import (
@@ -135,7 +136,6 @@ def inline_dispatcher(update: Update, context: CallbackContext):
     if status==EInlineStep.completed or status==EInlineStep.ask_teacher:
         deny_inline_usage(update)
         return
-    print(update.callback_query)
     if status==EInlineStep.ask_day:
         context.user_data["teacher_schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
         target = get_day(update,context)
@@ -241,94 +241,36 @@ def get_name(update: Update, context: CallbackContext) -> int:
     # Устанавливаем состояние в GETDAY (ожидание ввода дня недели)
     return GETDAY
 
+def construct_weeks_markup():
+    req =  requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+    current_week = req["week"]
+    week_indicator="●"
+    today = datetime.date.today()
+    for day in ImportantDays.important_days:
+        if abs((day[ImportantDays.DATE]-today).days)<=day[ImportantDays.INTERVAL]:
+            week_indicator=day[ImportantDays.SIGN]
+
+    reply_mark = InlineKeyboardMarkup([])
+    button_list = []
+    for i in range(1,18):
+        tmp_sign = ""
+        if current_week==i:
+            tmp_sign=week_indicator
+        button_list.append(InlineKeyboardButton(text=f"{tmp_sign}{i}{tmp_sign}", callback_data=i))
+        if i%4==0 or i==17:
+            reply_mark.inline_keyboard.append(button_list)
+            button_list=[]
+    backspace = []
+    backspace.append(InlineKeyboardButton(text="Назад",callback_data="back"))
+    reply_mark.inline_keyboard.append(backspace)
+    return reply_mark
+
 
 def get_day(update: Update, context: CallbackContext):
-    # easter eggs :) holidays triggers for week cursor
-    new_year = datetime.datetime(2020, 12, 31)
-    love_day = datetime.datetime(2020, 2, 14)
-    delta = datetime.timedelta(days=365)
-    today = datetime.datetime.today()
-    # new year handler
-    if abs((today - new_year) % delta).days <= 20 or abs((today - new_year) % delta).days >= 345:
-
-        s = "❄️"
-    elif abs((today - love_day) % delta).days <= 1 or abs((today - love_day) % delta).days >= 364:
-        s = "❤️"
-    else:
-        s = "•"
-
-    # current week cursor handler
-    week = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
-    cur_week = week["week"]
+    req = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+    cur_week = req["week"]
     context.user_data["week"] = cur_week
-    WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(f"{s}1{s}", callback_data="1")
-                if cur_week == 1
-                else InlineKeyboardButton("1", callback_data="1"),
-                InlineKeyboardButton(f"{s}2{s}", callback_data="2")
-                if cur_week == 2
-                else InlineKeyboardButton("2", callback_data="2"),
-                InlineKeyboardButton(f"{s}3{s}", callback_data="3")
-                if cur_week == 3
-                else InlineKeyboardButton("3", callback_data="3"),
-                InlineKeyboardButton(f"{s}4{s}", callback_data="4")
-                if cur_week == 4
-                else InlineKeyboardButton("4", callback_data="4"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}5{s}", callback_data="5")
-                if cur_week == 5
-                else InlineKeyboardButton("5", callback_data="5"),
-                InlineKeyboardButton(f"{s}6{s}", callback_data="6")
-                if cur_week == 6
-                else InlineKeyboardButton("6", callback_data="6"),
-                InlineKeyboardButton(f"{s}7{s}", callback_data="7")
-                if cur_week == 7
-                else InlineKeyboardButton("7", callback_data="7"),
-                InlineKeyboardButton(f"{s}8{s}", callback_data="8")
-                if cur_week == 8
-                else InlineKeyboardButton("8", callback_data="8"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}9{s}", callback_data="9")
-                if cur_week == 9
-                else InlineKeyboardButton("9", callback_data="9"),
-                InlineKeyboardButton(f"{s}10{s}", callback_data="10")
-                if cur_week == 10
-                else InlineKeyboardButton("10", callback_data="10"),
-                InlineKeyboardButton(f"{s}11{s}", callback_data="11")
-                if cur_week == 11
-                else InlineKeyboardButton("11", callback_data="11"),
-                InlineKeyboardButton(f"{s}12{s}", callback_data="12")
-                if cur_week == 12
-                else InlineKeyboardButton("12", callback_data="12"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}13{s}", callback_data="13")
-                if cur_week == 13
-                else InlineKeyboardButton("13", callback_data="13"),
-                InlineKeyboardButton(f"{s}14{s}", callback_data="14")
-                if cur_week == 14
-                else InlineKeyboardButton("14", callback_data="14"),
-                InlineKeyboardButton(f"{s}15{s}", callback_data="15")
-                if cur_week == 15
-                else InlineKeyboardButton("15", callback_data="15"),
-                InlineKeyboardButton(f"{s}16{s}", callback_data="16")
-                if cur_week == 16
-                else InlineKeyboardButton("16", callback_data="16"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}17{s}", callback_data="17")
-                if cur_week == 17
-                else InlineKeyboardButton("17", callback_data="17"),
-            ],
-            [
-                InlineKeyboardButton("Назад", callback_data="back"),
-            ],
-        ]
-    )
+    WEEKS_KEYBOARD_MARKUP=construct_weeks_markup()
     context.user_data["week_keyboard"] = WEEKS_KEYBOARD_MARKUP
     day = update.callback_query.data
     query = update.callback_query
