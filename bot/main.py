@@ -46,6 +46,10 @@ WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
             InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
         ],
         [
+            InlineKeyboardButton("Сегодня",callback_data="today"),
+            InlineKeyboardButton("Завтра", callback_data="tomorrow")
+        ],
+        [
             InlineKeyboardButton("Назад", callback_data="back"),
         ],
     ]
@@ -242,6 +246,10 @@ def get_name(update: Update, context: CallbackContext) -> int:
     return GETDAY
 
 def construct_weeks_markup():
+    """
+    Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
+    если текущий день соответствует некоторой памятной дате+-интервал
+    """
     req =  requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
     current_week = req["week"]
     week_indicator="●"
@@ -292,6 +300,17 @@ def get_day(update: Update, context: CallbackContext):
             text="Введите фамилию преподавателя",
         )
         return GETNAME
+    elif day=="today" or day=="tomorrow":
+        today = datetime.date.today().weekday()
+        if day=="tomorrow":
+            today=(datetime.date.today()+datetime.timedelta(days=1)).weekday()
+        week = req
+        if today==6:
+            update.callback_query.answer("В выбранный день пар нет")
+            return GETDAY
+        context.user_data["week"]=week
+        context.user_data["day"]=today
+        return show_result(update,context)
     else:
         query.edit_message_text(
             text="Неверный ввод",
@@ -299,30 +318,32 @@ def get_day(update: Update, context: CallbackContext):
         return GETDAY
 
 
-def get_week(update: Update, context: CallbackContext):
-    cur_week = context.user_data["week"]
-    WEEKS_KEYBOARD_MARKUP = context.user_data["week_keyboard"]
-    week_number = update.callback_query.data
-    query = update.callback_query
-    if week_number == "back":
-        query.edit_message_text(
+def week_selected_handler(update: Update, context: CallbackContext):
+    """
+    Обработчик нажатия на кнопку недели.
+    """
+    selected = update.callback_query.data
+    if selected=="back":
+        update.callback_query.edit_message_text(
             text="Введите день недели",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP
         )
         return GETDAY
+    selected_week = int(selected)
+    context.user_data["week"] = selected_week
+    return show_result(update,context)
 
-    if not week_number.strip().isdigit():
-        query.edit_message_text(
-            text="Выберите неделю\nТекущая неделя: " + str(cur_week), reply_markup=WEEKS_KEYBOARD_MARKUP
-        )
-        return GETWEEK
-
-    week_number = int(week_number)
+def show_result(update: Update, context: CallbackContext):
+    """
+    Выводит результат пользователю.
+    В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
+    """
+    week = context.user_data["week"]
     weekday = context.user_data["day"]
     schedule_data = context.user_data["teacher_schedule"]
     teacher_surname = context.user_data["teacher"]
 
-    parsed_schedule = parse(schedule_data, weekday, week_number, teacher_surname)
+    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
 
@@ -335,7 +356,6 @@ def get_week(update: Update, context: CallbackContext):
     text = format_outputs(parsed_schedule)
 
     return for_telegram(text, update)
-
 
 def parse(teacher_schedule, weekday, week_number, teacher):
     teacher_schedule = teacher_schedule["schedules"]
@@ -434,8 +454,8 @@ def main():
         states={
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
             GETDAY: [CallbackQueryHandler(get_day, run_async=True)],
-            GETWEEK: [CallbackQueryHandler(get_week, run_async=True)],
-            TEACHER_CLARIFY: [CallbackQueryHandler(teacher_clarify, run_async=True)]
+            GETWEEK: [CallbackQueryHandler(week_selected_handler, run_async=True)],
+            TEACHER_CLARIFY: [CallbackQueryHandler(teacher_clarify, run_async=True)],
         },
         fallbacks=[
             CommandHandler("start", start, run_async=True),
