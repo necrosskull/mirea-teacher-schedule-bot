@@ -143,14 +143,16 @@ def inline_dispatcher(update: Update, context: CallbackContext):
     if status==EInlineStep.ask_day:
         context.user_data["teacher_schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
         target = get_day(update,context)
-        if (target!=GETNAME):
+        if target==GETWEEK:
             context.user_data["inline_step"]=EInlineStep.ask_week
+        elif target==GETDAY or target==ConversationHandler.END:
+            return
         else:
             update.callback_query.edit_message_text("Вызовите бота снова, указав нужного преподавателя")
             context.user_data["inline_step"]=EInlineStep.ask_teacher
         return
     if status==EInlineStep.ask_week:
-        target = get_week(update,context)
+        target = week_selected_handler(update,context)
         if target==GETDAY:
             context.user_data["inline_step"]=EInlineStep.ask_day
         elif target != GETWEEK:
@@ -302,12 +304,15 @@ def get_day(update: Update, context: CallbackContext):
         return GETNAME
     elif day=="today" or day=="tomorrow":
         today = datetime.date.today().weekday()
+        week = cur_week
         if day=="tomorrow":
+            if today==6:
+                week+=1 #Корректировка недели, в случае если происходит переход недели
             today=(datetime.date.today()+datetime.timedelta(days=1)).weekday()
-        week = req
         if today==6:
             update.callback_query.answer("В выбранный день пар нет")
             return GETDAY
+        today+=1 #Корректировка дня с 0=пн на 1=пн
         context.user_data["week"]=week
         context.user_data["day"]=today
         return show_result(update,context)
@@ -393,10 +398,17 @@ def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackCont
     if not teacher_schedule:
         query = update.callback_query
 
+        #Костыль
+        #Исправление исключения отправки точно такого-же сообщения
+        query.edit_message_text(
+            text="Обработка...",
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+            )
+
         query.edit_message_text(
             text="В этот день нет пар \n\nВведите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-        )
+            )
         return False
 
     return True
