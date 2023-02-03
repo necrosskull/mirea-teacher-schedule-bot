@@ -1,9 +1,11 @@
 import datetime
 import logging
-
+from uuid import uuid4
 import requests
+from InlineStep import EInlineStep
+import ImportantDays
 from config import TELEGRAM_TOKEN
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -12,8 +14,9 @@ from telegram.ext import (
     Filters,
     MessageHandler,
     Updater,
+    InlineQueryHandler,
+ChosenInlineResultHandler
 )
-
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
@@ -41,6 +44,10 @@ WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
             InlineKeyboardButton(WEEKDAYS[4], callback_data="четверг"),
             InlineKeyboardButton(WEEKDAYS[5], callback_data="пятница"),
             InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
+        ],
+        [
+            InlineKeyboardButton("Сегодня",callback_data="today"),
+            InlineKeyboardButton("Завтра", callback_data="tomorrow")
         ],
         [
             InlineKeyboardButton("Назад", callback_data="back"),
@@ -80,6 +87,84 @@ def check_same_surnames(teacher_schedule, surname):
             if truncated not in str(surnames).replace(' ','') and truncated_surname in truncated:
                 surnames.append(teacher)
     return surnames
+def inlinequery(update: Update, context: CallbackContext):
+    """
+    Обработчик инлайн запросов
+    Создает Inline отображение
+    """
+    query = update.inline_query.query
+    if not query:
+        return
+    query = query.title()
+    if " " not in query:
+        query+=" "
+    teacher_schedule = fetch_schedule_by_name(query)
+    if teacher_schedule is None:
+        return
+    surnames = check_same_surnames(teacher_schedule, query)
+    if len(surnames) == 0:
+        return
+    inline_results = []
+    userid = str(update.inline_query.from_user.id)
+    for surname in surnames:
+        inline_results.append(InlineQueryResultArticle(
+            id = surname,
+            title=surname,
+            description="Нажми, чтобы посмотреть расписание",
+            input_message_content=InputTextMessageContent(
+                message_text=f"Выбран преподаватель: {surname}!"
+            ),
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP
+
+        ))
+    update.inline_query.answer(inline_results,cache_time=10,is_personal=True)
+
+def answer_inline_handler(update: Update, context:CallbackContext):
+    """
+    В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
+    и выставляет текущий шаг Inline запроса на ask_day
+    """
+    if update.chosen_inline_result is not None:
+        context.user_data["teacher"] = update.chosen_inline_result.result_id
+        context.user_data["inline_step"] =EInlineStep.ask_day
+        return
+
+def inline_dispatcher(update: Update, context: CallbackContext):
+    """
+    Обработка вызовов в чатах на основании Callback вызова
+    """
+    if "inline_step" not in context.user_data:
+        deny_inline_usage(update)
+        return
+    status = context.user_data["inline_step"]
+    if status==EInlineStep.completed or status==EInlineStep.ask_teacher:
+        deny_inline_usage(update)
+        return
+    if status==EInlineStep.ask_day:
+        context.user_data["teacher_schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+        target = get_day(update,context)
+        if target==GETWEEK:
+            context.user_data["inline_step"]=EInlineStep.ask_week
+        elif target==GETDAY or target==ConversationHandler.END:
+            return
+        else:
+            update.callback_query.edit_message_text("Вызовите бота снова, указав нужного преподавателя")
+            context.user_data["inline_step"]=EInlineStep.ask_teacher
+        return
+    if status==EInlineStep.ask_week:
+        target = week_selected_handler(update,context)
+        if target==GETDAY:
+            context.user_data["inline_step"]=EInlineStep.ask_day
+        elif target != GETWEEK:
+            context.user_data["inline_step"]=EInlineStep.completed
+        return
+
+def deny_inline_usage(update: Update):
+    """
+    Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
+    """
+    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. его вызвал другой человек",show_alert=True)
+    return
 
 def teacher_clarify(update: Update, context:CallbackContext)->int:
     """
@@ -162,94 +247,40 @@ def get_name(update: Update, context: CallbackContext) -> int:
     # Устанавливаем состояние в GETDAY (ожидание ввода дня недели)
     return GETDAY
 
+def construct_weeks_markup():
+    """
+    Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
+    если текущий день соответствует некоторой памятной дате+-интервал
+    """
+    req =  requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+    current_week = req["week"]
+    week_indicator="●"
+    today = datetime.date.today()
+    for day in ImportantDays.important_days:
+        if abs((day[ImportantDays.DATE]-today).days)<=day[ImportantDays.INTERVAL]:
+            week_indicator=day[ImportantDays.SIGN]
+
+    reply_mark = InlineKeyboardMarkup([])
+    button_list = []
+    for i in range(1,18):
+        tmp_sign = ""
+        if current_week==i:
+            tmp_sign=week_indicator
+        button_list.append(InlineKeyboardButton(text=f"{tmp_sign}{i}{tmp_sign}", callback_data=i))
+        if i%4==0 or i==17:
+            reply_mark.inline_keyboard.append(button_list)
+            button_list=[]
+    backspace = []
+    backspace.append(InlineKeyboardButton(text="Назад",callback_data="back"))
+    reply_mark.inline_keyboard.append(backspace)
+    return reply_mark
+
 
 def get_day(update: Update, context: CallbackContext):
-    # easter eggs :) holidays triggers for week cursor
-    new_year = datetime.datetime(2020, 12, 31)
-    love_day = datetime.datetime(2020, 2, 14)
-    delta = datetime.timedelta(days=365)
-    today = datetime.datetime.today()
-    # new year handler
-    if abs((today - new_year) % delta).days <= 20 or abs((today - new_year) % delta).days >= 345:
-
-        s = "❄️"
-    elif abs((today - love_day) % delta).days <= 1 or abs((today - love_day) % delta).days >= 364:
-        s = "❤️"
-    else:
-        s = "•"
-
-    # current week cursor handler
-    week = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
-    cur_week = week["week"]
+    req = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+    cur_week = req["week"]
     context.user_data["week"] = cur_week
-    WEEKS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(f"{s}1{s}", callback_data="1")
-                if cur_week == 1
-                else InlineKeyboardButton("1", callback_data="1"),
-                InlineKeyboardButton(f"{s}2{s}", callback_data="2")
-                if cur_week == 2
-                else InlineKeyboardButton("2", callback_data="2"),
-                InlineKeyboardButton(f"{s}3{s}", callback_data="3")
-                if cur_week == 3
-                else InlineKeyboardButton("3", callback_data="3"),
-                InlineKeyboardButton(f"{s}4{s}", callback_data="4")
-                if cur_week == 4
-                else InlineKeyboardButton("4", callback_data="4"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}5{s}", callback_data="5")
-                if cur_week == 5
-                else InlineKeyboardButton("5", callback_data="5"),
-                InlineKeyboardButton(f"{s}6{s}", callback_data="6")
-                if cur_week == 6
-                else InlineKeyboardButton("6", callback_data="6"),
-                InlineKeyboardButton(f"{s}7{s}", callback_data="7")
-                if cur_week == 7
-                else InlineKeyboardButton("7", callback_data="7"),
-                InlineKeyboardButton(f"{s}8{s}", callback_data="8")
-                if cur_week == 8
-                else InlineKeyboardButton("8", callback_data="8"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}9{s}", callback_data="9")
-                if cur_week == 9
-                else InlineKeyboardButton("9", callback_data="9"),
-                InlineKeyboardButton(f"{s}10{s}", callback_data="10")
-                if cur_week == 10
-                else InlineKeyboardButton("10", callback_data="10"),
-                InlineKeyboardButton(f"{s}11{s}", callback_data="11")
-                if cur_week == 11
-                else InlineKeyboardButton("11", callback_data="11"),
-                InlineKeyboardButton(f"{s}12{s}", callback_data="12")
-                if cur_week == 12
-                else InlineKeyboardButton("12", callback_data="12"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}13{s}", callback_data="13")
-                if cur_week == 13
-                else InlineKeyboardButton("13", callback_data="13"),
-                InlineKeyboardButton(f"{s}14{s}", callback_data="14")
-                if cur_week == 14
-                else InlineKeyboardButton("14", callback_data="14"),
-                InlineKeyboardButton(f"{s}15{s}", callback_data="15")
-                if cur_week == 15
-                else InlineKeyboardButton("15", callback_data="15"),
-                InlineKeyboardButton(f"{s}16{s}", callback_data="16")
-                if cur_week == 16
-                else InlineKeyboardButton("16", callback_data="16"),
-            ],
-            [
-                InlineKeyboardButton(f"{s}17{s}", callback_data="17")
-                if cur_week == 17
-                else InlineKeyboardButton("17", callback_data="17"),
-            ],
-            [
-                InlineKeyboardButton("Назад", callback_data="back"),
-            ],
-        ]
-    )
+    WEEKS_KEYBOARD_MARKUP=construct_weeks_markup()
     context.user_data["week_keyboard"] = WEEKS_KEYBOARD_MARKUP
     day = update.callback_query.data
     query = update.callback_query
@@ -263,7 +294,6 @@ def get_day(update: Update, context: CallbackContext):
                 text="Выберите неделю\nТекущая неделя: " + str(cur_week),
                 reply_markup=WEEKS_KEYBOARD_MARKUP,
             )
-
             # Устанавливаем состояние в GETWEEK (ожидание ввода номера недели)
             return GETWEEK
 
@@ -272,38 +302,53 @@ def get_day(update: Update, context: CallbackContext):
             text="Введите фамилию преподавателя",
         )
         return GETNAME
+    elif day=="today" or day=="tomorrow":
+        today = datetime.date.today().weekday()
+        week = cur_week
+        if day=="tomorrow":
+            if today==6:
+                week+=1 #Корректировка недели, в случае если происходит переход недели
+            today=(datetime.date.today()+datetime.timedelta(days=1)).weekday()
+        if today==6:
+            update.callback_query.answer("В выбранный день пар нет")
+            return GETDAY
+        today+=1 #Корректировка дня с 0=пн на 1=пн
+        context.user_data["week"]=week
+        context.user_data["day"]=today
+        return show_result(update,context)
     else:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        query.edit_message_text(
             text="Неверный ввод",
         )
         return GETDAY
 
 
-def get_week(update: Update, context: CallbackContext):
-    cur_week = context.user_data["week"]
-    WEEKS_KEYBOARD_MARKUP = context.user_data["week_keyboard"]
-    week_number = update.callback_query.data
-    query = update.callback_query
-    if week_number == "back":
-        query.edit_message_text(
+def week_selected_handler(update: Update, context: CallbackContext):
+    """
+    Обработчик нажатия на кнопку недели.
+    """
+    selected = update.callback_query.data
+    if selected=="back":
+        update.callback_query.edit_message_text(
             text="Введите день недели",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP
         )
         return GETDAY
+    selected_week = int(selected)
+    context.user_data["week"] = selected_week
+    return show_result(update,context)
 
-    if not week_number.strip().isdigit():
-        query.edit_message_text(
-            text="Выберите неделю\nТекущая неделя: " + str(cur_week), reply_markup=WEEKS_KEYBOARD_MARKUP
-        )
-        return GETWEEK
-
-    week_number = int(week_number)
+def show_result(update: Update, context: CallbackContext):
+    """
+    Выводит результат пользователю.
+    В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
+    """
+    week = context.user_data["week"]
     weekday = context.user_data["day"]
     schedule_data = context.user_data["teacher_schedule"]
     teacher_surname = context.user_data["teacher"]
 
-    parsed_schedule = parse(schedule_data, weekday, week_number, teacher_surname)
+    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
 
@@ -316,7 +361,6 @@ def get_week(update: Update, context: CallbackContext):
     text = format_outputs(parsed_schedule)
 
     return for_telegram(text, update)
-
 
 def parse(teacher_schedule, weekday, week_number, teacher):
     teacher_schedule = teacher_schedule["schedules"]
@@ -354,10 +398,17 @@ def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackCont
     if not teacher_schedule:
         query = update.callback_query
 
+        #Костыль
+        #Исправление исключения отправки точно такого-же сообщения
+        query.edit_message_text(
+            text="Обработка...",
+            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
+            )
+
         query.edit_message_text(
             text="В этот день нет пар \n\nВведите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-        )
+            )
         return False
 
     return True
@@ -415,8 +466,8 @@ def main():
         states={
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
             GETDAY: [CallbackQueryHandler(get_day, run_async=True)],
-            GETWEEK: [CallbackQueryHandler(get_week, run_async=True)],
-            TEACHER_CLARIFY: [CallbackQueryHandler(teacher_clarify, run_async=True)]
+            GETWEEK: [CallbackQueryHandler(week_selected_handler, run_async=True)],
+            TEACHER_CLARIFY: [CallbackQueryHandler(teacher_clarify, run_async=True)],
         },
         fallbacks=[
             CommandHandler("start", start, run_async=True),
@@ -425,7 +476,9 @@ def main():
     )
 
     dispatcher.add_handler(conv_handler)
-
+    dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
+    dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
+    dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
     updater.start_polling()
 
 
