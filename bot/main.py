@@ -65,7 +65,11 @@ def fetch_schedule_by_name(teacher_name):
 
 
 def start(update: Update, context: CallbackContext) -> int:
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Введите фамилию преподавателя")
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Привет!\nЯ бот, который поможет тебе найти "
+                                                                    "расписание любого *преподавателя.*\nНапиши мне "
+                                                                    "его фамилию"
+                                                                    " в формате:\n*Фамилия* или *Фамилия И.О.*",
+                             parse_mode="Markdown")
 
     # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
     return GETNAME
@@ -228,6 +232,7 @@ def decode_teachers(rawNames):
     else:
         decoded_names = rawNames
     return decoded_names
+
 
 def prepare_teacher_markup(teachers):
     """
@@ -529,6 +534,7 @@ def main():
     dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
     dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
+    dispatcher.add_handler(CommandHandler("help", start, run_async=True))
     updater.start_polling()
 
 
