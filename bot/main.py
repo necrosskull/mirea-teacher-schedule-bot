@@ -113,14 +113,15 @@ def inlinequery(update: Update, context: CallbackContext):
     if len(surnames) == 0:
         return
     inline_results = []
+    decoded_surnames = decode_teachers(surnames)
     userid = str(update.inline_query.from_user.id)
-    for surname in surnames:
+    for surname, decoded_surname in zip(surnames, decoded_surnames):
         inline_results.append(InlineQueryResultArticle(
             id=surname,
-            title=surname,
+            title=decoded_surname,
             description="Нажми, чтобы посмотреть расписание",
             input_message_content=InputTextMessageContent(
-                message_text=f"Выбран преподаватель: {surname}!"
+                message_text=f"Выбран преподаватель: {decoded_surname}!"
             ),
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP
 
@@ -489,9 +490,9 @@ def format_outputs(schedules):
 
     for schedule in schedules:
         room = ", ".join(schedule["lesson"]["rooms"])
-        teachers = ", ".join(schedule["lesson"]["teachers"])
+        teachers = schedule["lesson"]["teachers"]
         weekday = WEEKDAYS[schedule["weekday"]]
-
+        teachers = ", ".join(decode_teachers(teachers))
         text += f'📝 Пара № {schedule["lesson_number"] + 1} в ⏰ {schedule["lesson"]["time_start"]}–{schedule["lesson"]["time_end"]}\n'
         text += f'📝 {schedule["lesson"]["name"]}\n'
         text += f'👥 Группы: {schedule["group"]}\n'
