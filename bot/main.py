@@ -4,8 +4,9 @@ from uuid import uuid4
 import requests
 from InlineStep import EInlineStep
 import ImportantDays
-from config import TELEGRAM_TOKEN
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
+from config import TELEGRAM_TOKEN, cmstoken
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, \
+    InputTextMessageContent
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -15,8 +16,9 @@ from telegram.ext import (
     MessageHandler,
     Updater,
     InlineQueryHandler,
-ChosenInlineResultHandler
+    ChosenInlineResultHandler
 )
+
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
@@ -46,7 +48,7 @@ WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
             InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
         ],
         [
-            InlineKeyboardButton("Сегодня",callback_data="today"),
+            InlineKeyboardButton("Сегодня", callback_data="today"),
             InlineKeyboardButton("Завтра", callback_data="tomorrow")
         ],
         [
@@ -82,11 +84,13 @@ def check_same_surnames(teacher_schedule, surname):
     for schedule in schedules:
         teachers = schedule["lesson"]["teachers"]
         for teacher in teachers:
-            truncated = str(teacher).replace(" ",'')
-            truncated_surname = surname.replace(' ','')
-            if truncated not in str(surnames).replace(' ','') and truncated_surname in truncated:
+            truncated = str(teacher).replace(" ", '')
+            truncated_surname = surname.replace(' ', '')
+            if truncated not in str(surnames).replace(' ', '') and truncated_surname in truncated:
                 surnames.append(teacher)
     return surnames
+
+
 def inlinequery(update: Update, context: CallbackContext):
     """
     Обработчик инлайн запросов
@@ -97,7 +101,7 @@ def inlinequery(update: Update, context: CallbackContext):
         return
     query = query.title()
     if " " not in query:
-        query+=" "
+        query += " "
     teacher_schedule = fetch_schedule_by_name(query)
     if teacher_schedule is None:
         return
@@ -108,7 +112,7 @@ def inlinequery(update: Update, context: CallbackContext):
     userid = str(update.inline_query.from_user.id)
     for surname in surnames:
         inline_results.append(InlineQueryResultArticle(
-            id = surname,
+            id=surname,
             title=surname,
             description="Нажми, чтобы посмотреть расписание",
             input_message_content=InputTextMessageContent(
@@ -117,17 +121,19 @@ def inlinequery(update: Update, context: CallbackContext):
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP
 
         ))
-    update.inline_query.answer(inline_results,cache_time=10,is_personal=True)
+    update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
-def answer_inline_handler(update: Update, context:CallbackContext):
+
+def answer_inline_handler(update: Update, context: CallbackContext):
     """
     В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
     и выставляет текущий шаг Inline запроса на ask_day
     """
     if update.chosen_inline_result is not None:
         context.user_data["teacher"] = update.chosen_inline_result.result_id
-        context.user_data["inline_step"] =EInlineStep.ask_day
+        context.user_data["inline_step"] = EInlineStep.ask_day
         return
+
 
 def inline_dispatcher(update: Update, context: CallbackContext):
     """
@@ -137,36 +143,39 @@ def inline_dispatcher(update: Update, context: CallbackContext):
         deny_inline_usage(update)
         return
     status = context.user_data["inline_step"]
-    if status==EInlineStep.completed or status==EInlineStep.ask_teacher:
+    if status == EInlineStep.completed or status == EInlineStep.ask_teacher:
         deny_inline_usage(update)
         return
-    if status==EInlineStep.ask_day:
+    if status == EInlineStep.ask_day:
         context.user_data["teacher_schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
-        target = get_day(update,context)
-        if target==GETWEEK:
-            context.user_data["inline_step"]=EInlineStep.ask_week
-        elif target==GETDAY or target==ConversationHandler.END:
+        target = get_day(update, context)
+        if target == GETWEEK:
+            context.user_data["inline_step"] = EInlineStep.ask_week
+        elif target == GETDAY or target == ConversationHandler.END:
             return
         else:
             update.callback_query.edit_message_text("Вызовите бота снова, указав нужного преподавателя")
-            context.user_data["inline_step"]=EInlineStep.ask_teacher
+            context.user_data["inline_step"] = EInlineStep.ask_teacher
         return
-    if status==EInlineStep.ask_week:
-        target = week_selected_handler(update,context)
-        if target==GETDAY:
-            context.user_data["inline_step"]=EInlineStep.ask_day
+    if status == EInlineStep.ask_week:
+        target = week_selected_handler(update, context)
+        if target == GETDAY:
+            context.user_data["inline_step"] = EInlineStep.ask_day
         elif target != GETWEEK:
-            context.user_data["inline_step"]=EInlineStep.completed
+            context.user_data["inline_step"] = EInlineStep.completed
         return
+
 
 def deny_inline_usage(update: Update):
     """
     Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
     """
-    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. его вызвал другой человек",show_alert=True)
+    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. его вызвал другой человек",
+                                 show_alert=True)
     return
 
-def teacher_clarify(update: Update, context:CallbackContext)->int:
+
+def teacher_clarify(update: Update, context: CallbackContext) -> int:
     """
     Обработчик нажатия кнопки с ФИО преподавателя
     :param update: объект из telegram.update
@@ -175,10 +184,10 @@ def teacher_clarify(update: Update, context:CallbackContext)->int:
     """
     chosed_teacher = update.callback_query.data
     query = update.callback_query
-    if chosed_teacher=="back":
+    if chosed_teacher == "back":
         query.edit_message_text("Введите фамилию преподавателя")
         return GETNAME
-    context.user_data["teacher"]=chosed_teacher.split('.')[0]
+    context.user_data["teacher"] = chosed_teacher.split('.')[0]
     query.edit_message_text(
         text="Выберите день недели",
         reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
@@ -186,15 +195,53 @@ def teacher_clarify(update: Update, context:CallbackContext)->int:
     return GETDAY
 
 
+def decode_teachers(rawNames):
+    """
+    Декодирует ФИО преподавателей используя API CMS
+    :param rawNames: список необработанных ФИО
+    """
+    headers = {
+        "Authorization": f"Bearer {cmstoken}"}
+    params = {"rawNames": ",".join(rawNames)}
+
+    response = requests.get("https://cms.mirea.ninja/api/get-full-teacher-name", headers=headers, params=params)
+    if response.status_code == 200:
+        data = response.json()
+
+        decoded_names = []
+        for names in data:
+            if len(names["possibleFullNames"]) == 1:
+                decomposed_name = names["possibleFullNames"][0]
+                name = []
+                if surname := decomposed_name.get("lastName"):
+                    name.append(surname)
+                if first_name := decomposed_name.get("firstName"):
+                    name.append(first_name)
+                if middle_name := decomposed_name.get("middleName"):
+                    name.append(middle_name)
+                name = " ".join(name)
+            else:
+                name = names["rawName"]
+            decoded_names.append(name)
+
+        decoded_names = decoded_names
+    else:
+        decoded_names = rawNames
+    return decoded_names
+
 def prepare_teacher_markup(teachers):
     """
     Конструирует клавиатуру доступных преподавателей однофамильцев
     :param teachers: лист преподавателей
     """
+    rawNames = teachers
+    decoded_names = decode_teachers(rawNames)
+
     btns = []
-    for teacher in teachers:
-        btns = btns + [[InlineKeyboardButton(teacher, callback_data=teacher)]]
-    btns= btns + [[(InlineKeyboardButton("Назад", callback_data="back"))]]
+
+    for rawName, decoded_name in zip(rawNames, decoded_names):
+        btns = btns + [[InlineKeyboardButton(decoded_name, callback_data=rawName)]]
+    btns = btns + [[(InlineKeyboardButton("Назад", callback_data="back"))]]
     TEACHER_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
     return TEACHER_CLARIFY_MARKUP
 
@@ -203,7 +250,7 @@ def get_name(update: Update, context: CallbackContext) -> int:
     teacher = update.message.text
     teacher = teacher.title()
     if " " not in teacher:
-        teacher+=" "
+        teacher += " "
     # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
     teacher_schedule = fetch_schedule_by_name(teacher)
 
@@ -217,22 +264,22 @@ def get_name(update: Update, context: CallbackContext) -> int:
     # иначе сохраняем в контексте фамилию преподавателя.
     # `user_data` - это словарь, который можно использовать для хранения любых данных.
     # Для каждого обновления от одного и того же пользователя он будет одинаковым.
-    context.user_data["available_teachers"] = check_same_surnames(teacher_schedule,teacher)
-    if len(context.user_data["available_teachers"])>1:
+    context.user_data["available_teachers"] = check_same_surnames(teacher_schedule, teacher)
+    if len(context.user_data["available_teachers"]) > 1:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите преподавателя",
             reply_markup=prepare_teacher_markup(context.user_data["available_teachers"]),
         )
         return TEACHER_CLARIFY
-    elif len(context.user_data["available_teachers"])==0:
+    elif len(context.user_data["available_teachers"]) == 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Ошибка при определении ФИО. Повторите ввод изменив запрос, например введя фамилию вместо ФИО"
         )
         return GETNAME
     else:
-        context.user_data["teacher"]=context.user_data["available_teachers"][0]
+        context.user_data["teacher"] = context.user_data["available_teachers"][0]
     # Устанавливаем фамилию преподавателя в контексте.
     # `user_data` - это словарь, который можно использовать для хранения любых данных.
     # Для каждого обновления от одного и того же пользователя он будет одинаковым.
@@ -247,31 +294,32 @@ def get_name(update: Update, context: CallbackContext) -> int:
     # Устанавливаем состояние в GETDAY (ожидание ввода дня недели)
     return GETDAY
 
+
 def construct_weeks_markup():
     """
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
     если текущий день соответствует некоторой памятной дате+-интервал
     """
-    req =  requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+    req = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
     current_week = req["week"]
-    week_indicator="●"
+    week_indicator = "●"
     today = datetime.date.today()
     for day in ImportantDays.important_days:
-        if abs((day[ImportantDays.DATE]-today).days)<=day[ImportantDays.INTERVAL]:
-            week_indicator=day[ImportantDays.SIGN]
+        if abs((day[ImportantDays.DATE] - today).days) <= day[ImportantDays.INTERVAL]:
+            week_indicator = day[ImportantDays.SIGN]
 
     reply_mark = InlineKeyboardMarkup([])
     button_list = []
-    for i in range(1,18):
+    for i in range(1, 18):
         tmp_sign = ""
-        if current_week==i:
-            tmp_sign=week_indicator
+        if current_week == i:
+            tmp_sign = week_indicator
         button_list.append(InlineKeyboardButton(text=f"{tmp_sign}{i}{tmp_sign}", callback_data=i))
-        if i%4==0 or i==17:
+        if i % 4 == 0 or i == 17:
             reply_mark.inline_keyboard.append(button_list)
-            button_list=[]
+            button_list = []
     backspace = []
-    backspace.append(InlineKeyboardButton(text="Назад",callback_data="back"))
+    backspace.append(InlineKeyboardButton(text="Назад", callback_data="back"))
     reply_mark.inline_keyboard.append(backspace)
     return reply_mark
 
@@ -280,7 +328,7 @@ def get_day(update: Update, context: CallbackContext):
     req = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
     cur_week = req["week"]
     context.user_data["week"] = cur_week
-    WEEKS_KEYBOARD_MARKUP=construct_weeks_markup()
+    WEEKS_KEYBOARD_MARKUP = construct_weeks_markup()
     context.user_data["week_keyboard"] = WEEKS_KEYBOARD_MARKUP
     day = update.callback_query.data
     query = update.callback_query
@@ -302,20 +350,20 @@ def get_day(update: Update, context: CallbackContext):
             text="Введите фамилию преподавателя",
         )
         return GETNAME
-    elif day=="today" or day=="tomorrow":
+    elif day == "today" or day == "tomorrow":
         today = datetime.date.today().weekday()
         week = cur_week
-        if day=="tomorrow":
-            if today==6:
-                week+=1 #Корректировка недели, в случае если происходит переход недели
-            today=(datetime.date.today()+datetime.timedelta(days=1)).weekday()
-        if today==6:
+        if day == "tomorrow":
+            if today == 6:
+                week += 1  # Корректировка недели, в случае если происходит переход недели
+            today = (datetime.date.today() + datetime.timedelta(days=1)).weekday()
+        if today == 6:
             update.callback_query.answer("В выбранный день пар нет")
             return GETDAY
-        today+=1 #Корректировка дня с 0=пн на 1=пн
-        context.user_data["week"]=week
-        context.user_data["day"]=today
-        return show_result(update,context)
+        today += 1  # Корректировка дня с 0=пн на 1=пн
+        context.user_data["week"] = week
+        context.user_data["day"] = today
+        return show_result(update, context)
     else:
         query.edit_message_text(
             text="Неверный ввод",
@@ -328,7 +376,7 @@ def week_selected_handler(update: Update, context: CallbackContext):
     Обработчик нажатия на кнопку недели.
     """
     selected = update.callback_query.data
-    if selected=="back":
+    if selected == "back":
         update.callback_query.edit_message_text(
             text="Введите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP
@@ -336,7 +384,8 @@ def week_selected_handler(update: Update, context: CallbackContext):
         return GETDAY
     selected_week = int(selected)
     context.user_data["week"] = selected_week
-    return show_result(update,context)
+    return show_result(update, context)
+
 
 def show_result(update: Update, context: CallbackContext):
     """
@@ -362,6 +411,7 @@ def show_result(update: Update, context: CallbackContext):
 
     return for_telegram(text, update)
 
+
 def parse(teacher_schedule, weekday, week_number, teacher):
     teacher_schedule = teacher_schedule["schedules"]
     teacher_schedule = list(filter(lambda x: teacher in str(x["lesson"]["teachers"]), teacher_schedule))
@@ -380,10 +430,10 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     for i in range(len(teacher_schedule)):
         for j in range(i + 1, len(teacher_schedule)):
             if (
-                teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
-                and teacher_schedule[i]["lesson"]["name"] == teacher_schedule[j]["lesson"]["name"]
-                and teacher_schedule[i]["lesson"]["weeks"] == teacher_schedule[j]["lesson"]["weeks"]
-                and teacher_schedule[i]["lesson"]["time_start"] == teacher_schedule[j]["lesson"]["time_start"]
+                    teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
+                    and teacher_schedule[i]["lesson"]["name"] == teacher_schedule[j]["lesson"]["name"]
+                    and teacher_schedule[i]["lesson"]["weeks"] == teacher_schedule[j]["lesson"]["weeks"]
+                    and teacher_schedule[i]["lesson"]["time_start"] == teacher_schedule[j]["lesson"]["time_start"]
             ):
                 teacher_schedule[i]["group"] += ", " + teacher_schedule[j]["group"]
                 remove_index.append(j)
@@ -398,17 +448,17 @@ def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackCont
     if not teacher_schedule:
         query = update.callback_query
 
-        #Костыль
-        #Исправление исключения отправки точно такого-же сообщения
+        # Костыль
+        # Исправление исключения отправки точно такого-же сообщения
         query.edit_message_text(
             text="Обработка...",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-            )
+        )
 
         query.edit_message_text(
             text="В этот день нет пар \n\nВведите день недели",
             reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-            )
+        )
         return False
 
     return True
@@ -453,7 +503,7 @@ def for_telegram(text, update: Update):
     text_len = len(text)
     query = update.callback_query
     for i in range(0, text_len, 4096):
-        query.edit_message_text(text[i : i + 4096])
+        query.edit_message_text(text[i: i + 4096])
     return ConversationHandler.END
 
 
