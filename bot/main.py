@@ -192,7 +192,7 @@ def teacher_clarify(update: Update, context: CallbackContext) -> int:
     if chosed_teacher == "back":
         query.edit_message_text("Введите фамилию преподавателя")
         return GETNAME
-    context.user_data["teacher"] = chosed_teacher.split('.')[0]
+    context.user_data["teacher"] = chosed_teacher
     query.edit_message_text(
         text="Выберите день недели",
         reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
