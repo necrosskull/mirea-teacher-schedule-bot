@@ -163,3 +163,8 @@ weekcheck.py
 .idea/
 =======
 >>>>>>> main
+bot/exambot.py
+bot/exams.json
+bot/inlinebot.py
+bot/rassilka.py
+exams.json
