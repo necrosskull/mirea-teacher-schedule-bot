@@ -1,6 +1,5 @@
 import datetime
 import logging
-from uuid import uuid4
 import requests
 from InlineStep import EInlineStep
 import ImportantDays
@@ -26,54 +25,251 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY = range(4)
 
-WEEKDAYS = {
-    1: "Понедельник",
-    2: "Вторник",
-    3: "Среда",
-    4: "Четверг",
-    5: "Пятница",
-    6: "Суббота",
-}
-
-WEEKDAYS_KEYBOARD_MARKUP = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton(WEEKDAYS[1], callback_data="понедельник"),
-            InlineKeyboardButton(WEEKDAYS[2], callback_data="вторник"),
-            InlineKeyboardButton(WEEKDAYS[3], callback_data="среда"),
-        ],
-        [
-            InlineKeyboardButton(WEEKDAYS[4], callback_data="четверг"),
-            InlineKeyboardButton(WEEKDAYS[5], callback_data="пятница"),
-            InlineKeyboardButton(WEEKDAYS[6], callback_data="суббота"),
-        ],
-        [
-            InlineKeyboardButton("Сегодня", callback_data="today"),
-            InlineKeyboardButton("Завтра", callback_data="tomorrow")
-        ],
-        [
-            InlineKeyboardButton("Назад", callback_data="back"),
-        ],
-    ]
-)
-
-
-def fetch_schedule_by_name(teacher_name):
-    url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher_name}"
-    response = requests.get(url)
-    return response.json() if response.status_code == 200 else None
-
-
+#Handlers
 def start(update: Update, context: CallbackContext) -> int:
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Привет!\nЯ бот, который поможет тебе найти "
-                                                                    "расписание любого *преподавателя.*\nНапиши мне "
-                                                                    "его фамилию"
-                                                                    " в формате:\n*Фамилия* или *Фамилия И.О.*",
-                             parse_mode="Markdown")
+    """
+    Привествие бота при использовании команды /start
+    """
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Привет!\nЯ бот, который поможет тебе найти "
+             "расписание любого *преподавателя.*\nНапиши мне "
+             "его фамилию"
+             " в формате:\n*Фамилия* или *Фамилия И.О.*",
+        parse_mode="Markdown")
 
     # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
     return GETNAME
 
+
+def got_name_handler(update: Update, context: CallbackContext) -> int:
+    """
+    Реакция бота на получение фамилии преподавателя при состоянии GETNAME
+    :param update - Update класс API
+    :param context - CallbackContext класс API
+    :return: int сигнатура следующего состояния
+    """
+    inputed_teacher = update.message.text
+    teacher = normalize_teachername(inputed_teacher)
+
+    # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
+    teacher_schedule = fetch_schedule_by_name(teacher)
+
+    if teacher_schedule is None:
+        context.bot.send_message(
+            chat_id = update.effective_chat.id,
+            text = "Преподаватель не найден\nПопробуйте еще раз")
+        return GETNAME
+
+    context.user_data["schedule"] = teacher_schedule
+    available_teachers = check_same_surnames(teacher_schedule, teacher)
+
+    if len(available_teachers)>1:
+        context.user_data["available_teachers"] = available_teachers
+        return send_teacher_clarity(update,context, True)
+
+    elif len(available_teachers)==0:
+        context.bot.send_message(
+            chat_id = update.effective_chat.id,
+            text = "Ошибка при определении ФИО преподавателя. Повторите попытку, изменив запрос.\n"+
+                   "Например введите только фамилию преподавателя."
+        )
+        return GETNAME
+
+    else:
+        context.user_data["available_teachers"]=None
+        context.user_data['teacher'] = available_teachers[0]
+        return send_week_selector(update,context,True)
+
+
+def got_teacher_clarification_handler(update: Update, context: CallbackContext):
+    """
+    Реакция бота на получение фамилии преподавателя при уточнении, при состоянии TEACHER_CLARIFY
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Int код шага
+    """
+    chosed_teacher = update.callback_query.data
+    context.user_data['teacher']=chosed_teacher
+    clarified_schedule = fetch_schedule_by_name(chosed_teacher)
+    context.user_data['schedule'] = clarified_schedule
+    if chosed_teacher == "back":
+        return resend_name_input(update,context)
+    return send_week_selector(update, context)
+
+def got_week_handler(update: Update, context: CallbackContext) -> int:
+    """
+    Реакция бота на получение информации о выбранной недели в состоянии GETWEEK
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Int код шага
+    """
+    selected_button = update.callback_query.data
+    if selected_button == "back":
+        if context.user_data["available_teachers"]!=None:
+            return send_teacher_clarity(update,context)
+        else:
+            return resend_name_input(update,context)
+
+    elif selected_button == "today" or selected_button == "tomorrow":
+        today = datetime.date.today().weekday()
+        req = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
+        week = req["week"]
+        if selected_button == "tomorrow":
+            if today == 6:
+                week += 1  # Корректировка недели, в случае если происходит переход недели
+            today = (datetime.date.today() + datetime.timedelta(days=1)).weekday()
+        if today == 6:
+            update.callback_query.answer("В выбранный день пар нет")
+            return GETWEEK
+        today += 1  # Корректировка дня с 0=пн на 1=пн
+        context.user_data["week"] = week
+        context.user_data["day"] = today
+        send_result(update, context)
+        return GETNAME
+
+    else:
+        selected_week = int(selected_button)
+        context.user_data["week"] = selected_week
+        return send_day_selector(update,context)
+
+def got_day_handler(update: Update, context: CallbackContext):
+    """
+    Реакция бота на выбор дня недели, предоставленный пользователю, в состоянии GETDAY
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Int код шага
+    """
+    selected_button = update.callback_query.data
+    if selected_button == "chill":
+        update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
+        return GETDAY
+    if selected_button == "back":
+        return send_week_selector(update,context)
+    selected_day = -1
+    if selected_button!="week":
+        selected_day = int(selected_button)
+    context.user_data["day"] = selected_day
+    send_result(update,context)
+    return GETNAME
+
+#End Handlers
+def normalize_teachername(raw_teacher_name: str):
+    """
+    Нормализация фамилии для уточнения.
+    @param raw_teacher_name: Ввод пользователя
+    @return: Фамилия начинаяющая с большой буквы и с пробелом в конце
+    """
+    teacher = raw_teacher_name.title()
+    if(teacher[-1]!=" "):
+        teacher+=" "
+    return teacher
+
+def fetch_schedule_by_name(teacher_name):
+    """
+    Получение информации о расписании через API Mirea Ninja
+    @param teacher_name: Имя преподавателя
+    @return: JSON расписание или None если преподаватель не найден
+    """
+    url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher_name}"
+    response = requests.get(url)
+    return response.json() if response.status_code == 200 else None
+
+def send_week_selector(update: Update, context: CallbackContext, firsttime = False):
+    """
+    Отправка селектора недели. По умолчанию изменяет предыдущее сообщение, но при firsttime=True отправляет в виде нового сообщения
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @param firsttime: Впервые ли производится общение с пользователем
+    @return: Статус следующего шага - GETWEEK
+    """
+    if firsttime:
+        context.bot.send_message(
+            chat_id = update.effective_chat.id,
+            text=f"Выбран преподаватель: {context.user_data['teacher']}\n" +
+                 f"Выберите неделю",
+            reply_markup=construct_weeks_markup()
+        )
+    else:
+        update.callback_query.edit_message_text(
+        text=f"Выбран преподаватель: {context.user_data['teacher']}\n" +
+             f"Выберите неделю",
+        reply_markup=construct_weeks_markup()
+    )
+    return GETWEEK
+
+def resend_name_input(update: Update, context: CallbackContext):
+    """
+    Просит ввести имя преподавателя заново
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Статус следующего шага - GETNAME
+    """
+    update.callback_query.edit_message_text(
+        text=f"Введите снова нужную фамлию преподавателя."
+    )
+    return GETNAME
+
+def send_teacher_clarity(update: Update, context: CallbackContext,firsttime=False):
+    """
+    Отправляет список обнаруженных преподавателей. В случае если общение с пользователем не впервые - редактирует сообщение, иначе отправляет новое.
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @param firsttime: Впервые ли производится общение с пользователем
+    @return: Статус следующего шага - TEACHER_CLARIFY
+    """
+    available_teachers = context.user_data["available_teachers"]
+    few_teachers_markup = prepare_teacher_markup(available_teachers)
+    if firsttime:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Выберите преподвателя",
+            reply_markup=few_teachers_markup
+        )
+    else:
+        update.callback_query.edit_message_text(
+            text="Выберите преподвателя",
+            reply_markup=few_teachers_markup
+        )
+    return TEACHER_CLARIFY
+
+def send_day_selector(update: Update, context: CallbackContext):
+    """
+    Отправляет селектор дня недели с указанием дней, когда преподаватель не имеет пар.
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Статус следующего шага - GETDAY
+    """
+    teacher = context.user_data["teacher"]
+    week = context.user_data["week"]
+    schedule = context.user_data["schedule"]
+    teacher_workdays = construct_teacher_workdays(teacher,week,schedule)
+    update.callback_query.edit_message_text(
+        text = f"Выбран преподаватель: {teacher} \n"+
+               f"Выбрана неделя: {week} \n" +
+               f"Выберите день",
+        reply_markup = teacher_workdays
+    )
+    return GETDAY
+
+def send_result(update: Update, context: CallbackContext):
+    """
+    Выводит результат пользователю.
+    В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
+    Если user_data["week"]=-1 - выводится вся неделя
+    """
+    week = context.user_data["week"]
+    weekday = context.user_data["day"]
+    schedule_data = context.user_data["schedule"]
+    teacher_surname = context.user_data["teacher"]
+
+    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
+    parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
+    parsed_schedule = merge_weeks_numbers(parsed_schedule)
+    # Отправляем расписание преподавателя
+    blocks_of_text = format_outputs(parsed_schedule)
+
+    return telegram_delivery_optimisation(blocks_of_text, update,context)
 
 def check_same_surnames(teacher_schedule, surname):
     """
@@ -94,110 +290,49 @@ def check_same_surnames(teacher_schedule, surname):
                 surnames.append(teacher)
     return surnames
 
-
-def inlinequery(update: Update, context: CallbackContext):
+def construct_teacher_workdays(teacher: str, week:int,schedule:list):
     """
-    Обработчик инлайн запросов
-    Создает Inline отображение
+    Создает Inline клавиатуру с днями недели, когда у преподавателя есть пары.
+    В случае если у преподавателя есть пары, то колбэк кнопки равен дню недели
+    В случае если пар нет, то колбэк кнопки равен 'chill'
+    @param teacher: Имя преподавателя
+    @param week: Номер недели
+    @param schedule: Расписание в JSON
+    @return: InlineKeyboard со стилизованными кнопками
     """
-    query = update.inline_query.query
-    if not query:
-        return
-    query = query.title()
-    if " " not in query:
-        query += " "
-    teacher_schedule = fetch_schedule_by_name(query)
-    if teacher_schedule is None:
-        return
-    surnames = check_same_surnames(teacher_schedule, query)
-    if len(surnames) == 0:
-        return
-    inline_results = []
-    decoded_surnames = decode_teachers(surnames)
-    userid = str(update.inline_query.from_user.id)
-    for surname, decoded_surname in zip(surnames, decoded_surnames):
-        inline_results.append(InlineQueryResultArticle(
-            id=surname,
-            title=decoded_surname,
-            description="Нажми, чтобы посмотреть расписание",
-            input_message_content=InputTextMessageContent(
-                message_text=f"Выбран преподаватель: {decoded_surname}!"
-            ),
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP
+    founded_days = []
+    for lesson in schedule['schedules']:
+        if week in lesson['lesson']['weeks']:
+            if lesson['weekday'] not in founded_days:
+                founded_days.append(lesson['weekday'])
 
-        ))
-    update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
-
-
-def answer_inline_handler(update: Update, context: CallbackContext):
-    """
-    В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
-    и выставляет текущий шаг Inline запроса на ask_day
-    """
-    if update.chosen_inline_result is not None:
-        context.user_data["teacher"] = update.chosen_inline_result.result_id
-        context.user_data["inline_step"] = EInlineStep.ask_day
-        return
-
-
-def inline_dispatcher(update: Update, context: CallbackContext):
-    """
-    Обработка вызовов в чатах на основании Callback вызова
-    """
-    if "inline_step" not in context.user_data:
-        deny_inline_usage(update)
-        return
-    status = context.user_data["inline_step"]
-    if status == EInlineStep.completed or status == EInlineStep.ask_teacher:
-        deny_inline_usage(update)
-        return
-    if status == EInlineStep.ask_day:
-        context.user_data["teacher_schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
-        target = get_day(update, context)
-        if target == GETWEEK:
-            context.user_data["inline_step"] = EInlineStep.ask_week
-        elif target == GETDAY or target == ConversationHandler.END:
-            return
-        else:
-            update.callback_query.edit_message_text("Вызовите бота снова, указав нужного преподавателя")
-            context.user_data["inline_step"] = EInlineStep.ask_teacher
-        return
-    if status == EInlineStep.ask_week:
-        target = week_selected_handler(update, context)
-        if target == GETDAY:
-            context.user_data["inline_step"] = EInlineStep.ask_day
-        elif target != GETWEEK:
-            context.user_data["inline_step"] = EInlineStep.completed
-        return
-
-
-def deny_inline_usage(update: Update):
-    """
-    Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
-    """
-    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. его вызвал другой человек",
-                                 show_alert=True)
-    return
-
-
-def teacher_clarify(update: Update, context: CallbackContext) -> int:
-    """
-    Обработчик нажатия кнопки с ФИО преподавателя
-    :param update: объект из telegram.update
-    :param context: контекст callback события
-    :return: код дальнейшего шага (GETDAY || GETNAME)
-    """
-    chosed_teacher = update.callback_query.data
-    query = update.callback_query
-    if chosed_teacher == "back":
-        query.edit_message_text("Введите фамилию преподавателя")
-        return GETNAME
-    context.user_data["teacher"] = chosed_teacher
-    query.edit_message_text(
-        text="Выберите день недели",
-        reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-    )
-    return GETDAY
+    no_work_indicator = "🏖️"
+    weekdays = {
+        1: "ПН",
+        2: "ВТ",
+        3: "СР",
+        4: "ЧТ",
+        5: "ПТ",
+        6: "СБ",
+    }
+    ready_markup = InlineKeyboardMarkup([])
+    row_list = []
+    for i in range(1,7):
+        sign = ""
+        callback = i
+        if i not in founded_days:
+            sign = "⛔"
+            callback = "chill"
+        row_list.append(InlineKeyboardButton(text=f"{sign}{weekdays[i]}{sign}", callback_data=callback))
+        if i%3==0:
+            ready_markup.inline_keyboard.append(row_list)
+            row_list=[]
+    row_list.append(InlineKeyboardButton(text="На неделю",callback_data="week"))
+    ready_markup.inline_keyboard.append(row_list)
+    row_list=[]
+    row_list.append(InlineKeyboardButton(text="Назад",callback_data="back"))
+    ready_markup.inline_keyboard.append(row_list)
+    return ready_markup
 
 
 def decode_teachers(rawNames):
@@ -251,56 +386,6 @@ def prepare_teacher_markup(teachers):
     TEACHER_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
     return TEACHER_CLARIFY_MARKUP
 
-
-def get_name(update: Update, context: CallbackContext) -> int:
-    teacher = update.message.text
-    teacher = teacher.title()
-    if " " not in teacher:
-        teacher += " "
-    # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
-    teacher_schedule = fetch_schedule_by_name(teacher)
-
-    if teacher_schedule is None:
-        update.message.reply_text("Преподаватель не найден\nПопробуйте еще раз")
-        return GETNAME
-
-    context.user_data["teacher_schedule"] = teacher_schedule
-
-    # Определяем наличие однофамильцев, при их наличии предоставляем выбор
-    # иначе сохраняем в контексте фамилию преподавателя.
-    # `user_data` - это словарь, который можно использовать для хранения любых данных.
-    # Для каждого обновления от одного и того же пользователя он будет одинаковым.
-    context.user_data["available_teachers"] = check_same_surnames(teacher_schedule, teacher)
-    if len(context.user_data["available_teachers"]) > 1:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Выберите преподавателя",
-            reply_markup=prepare_teacher_markup(context.user_data["available_teachers"]),
-        )
-        return TEACHER_CLARIFY
-    elif len(context.user_data["available_teachers"]) == 0:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Ошибка при определении ФИО. Повторите ввод изменив запрос, например введя фамилию вместо ФИО"
-        )
-        return GETNAME
-    else:
-        context.user_data["teacher"] = context.user_data["available_teachers"][0]
-    # Устанавливаем фамилию преподавателя в контексте.
-    # `user_data` - это словарь, который можно использовать для хранения любых данных.
-    # Для каждого обновления от одного и того же пользователя он будет одинаковым.
-
-    # Отправляем клавиатуру с выбором дня недели
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Введите день недели",
-        reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-    )
-
-    # Устанавливаем состояние в GETDAY (ожидание ввода дня недели)
-    return GETDAY
-
-
 def construct_weeks_markup():
     """
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
@@ -325,109 +410,24 @@ def construct_weeks_markup():
             reply_mark.inline_keyboard.append(button_list)
             button_list = []
     backspace = []
+    backspace.append(InlineKeyboardButton(text="Сегодня", callback_data="today"))
+    backspace.append(InlineKeyboardButton(text="Завтра", callback_data="tomorrow"))
+    reply_mark.inline_keyboard.append(backspace)
+    backspace = []
     backspace.append(InlineKeyboardButton(text="Назад", callback_data="back"))
     reply_mark.inline_keyboard.append(backspace)
     return reply_mark
 
-
-def get_day(update: Update, context: CallbackContext):
-    req = requests.get("https://schedule.mirea.ninja/api/schedule/current_week").json()
-    cur_week = req["week"]
-    context.user_data["week"] = cur_week
-    WEEKS_KEYBOARD_MARKUP = construct_weeks_markup()
-    context.user_data["week_keyboard"] = WEEKS_KEYBOARD_MARKUP
-    day = update.callback_query.data
-    query = update.callback_query
-    for key, value in WEEKDAYS.items():
-        if day == value.lower():
-            # Устанавливаем день недели в контексте
-            context.user_data["day"] = key
-
-            # Отправляем клавиатуру с выбором номера недели
-            query.edit_message_text(
-                text="Выберите неделю\nТекущая неделя: " + str(cur_week),
-                reply_markup=WEEKS_KEYBOARD_MARKUP,
-            )
-            # Устанавливаем состояние в GETWEEK (ожидание ввода номера недели)
-            return GETWEEK
-
-    if day == "back":
-        query.edit_message_text(
-            text="Введите фамилию преподавателя",
-        )
-        return GETNAME
-    elif day == "today" or day == "tomorrow":
-        today = datetime.date.today().weekday()
-        week = cur_week
-        if day == "tomorrow":
-            if today == 6:
-                week += 1  # Корректировка недели, в случае если происходит переход недели
-            today = (datetime.date.today() + datetime.timedelta(days=1)).weekday()
-        if today == 6:
-            update.callback_query.answer("В выбранный день пар нет")
-            return GETDAY
-        today += 1  # Корректировка дня с 0=пн на 1=пн
-        context.user_data["week"] = week
-        context.user_data["day"] = today
-        return show_result(update, context)
-    else:
-        query.edit_message_text(
-            text="Неверный ввод",
-        )
-        return GETDAY
-
-
-def week_selected_handler(update: Update, context: CallbackContext):
-    """
-    Обработчик нажатия на кнопку недели.
-    """
-    selected = update.callback_query.data
-    if selected == "back":
-        update.callback_query.edit_message_text(
-            text="Введите день недели",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP
-        )
-        return GETDAY
-    selected_week = int(selected)
-    context.user_data["week"] = selected_week
-    return show_result(update, context)
-
-
-def show_result(update: Update, context: CallbackContext):
-    """
-    Выводит результат пользователю.
-    В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
-    """
-    week = context.user_data["week"]
-    weekday = context.user_data["day"]
-    schedule_data = context.user_data["teacher_schedule"]
-    teacher_surname = context.user_data["teacher"]
-
-    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
-    parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
-    parsed_schedule = merge_weeks_numbers(parsed_schedule)
-
-    is_having_schedule = have_teacher_lessons(parsed_schedule, update, context)
-
-    if not is_having_schedule:
-        return GETDAY
-
-    # Отправляем расписание преподавателя
-    text = format_outputs(parsed_schedule)
-
-    return for_telegram(text, update)
-
-
 def parse(teacher_schedule, weekday, week_number, teacher):
     teacher_schedule = teacher_schedule["schedules"]
     teacher_schedule = list(filter(lambda x: teacher in str(x["lesson"]["teachers"]), teacher_schedule))
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
-    teacher_schedule = list(filter(lambda x: x["weekday"] == int(weekday), teacher_schedule))
+    if (weekday!=-1):
+        teacher_schedule = list(filter(lambda x: x["weekday"] == int(weekday), teacher_schedule))
     teacher_schedule = list(filter(lambda x: int(week_number) in x["lesson"]["weeks"], teacher_schedule))
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_start"])
     teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_end"])
-
+    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
     return teacher_schedule
 
 
@@ -450,26 +450,6 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     return teacher_schedule
 
 
-def have_teacher_lessons(teacher_schedule, update: Update, context: CallbackContext):
-    if not teacher_schedule:
-        query = update.callback_query
-
-        # Костыль
-        # Исправление исключения отправки точно такого-же сообщения
-        query.edit_message_text(
-            text="Обработка...",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-        )
-
-        query.edit_message_text(
-            text="В этот день нет пар \n\nВведите день недели",
-            reply_markup=WEEKDAYS_KEYBOARD_MARKUP,
-        )
-        return False
-
-    return True
-
-
 def merge_weeks_numbers(teacher_schedule):
     for i in range(len(teacher_schedule)):
         weeks = teacher_schedule[i]["lesson"]["weeks"]
@@ -487,12 +467,21 @@ def merge_weeks_numbers(teacher_schedule):
 
 def format_outputs(schedules):
     text = ""
-
+    WEEKDAYS = {
+        1: "Понедельник",
+        2: "Вторник",
+        3: "Среда",
+        4: "Четверг",
+        5: "Пятница",
+        6: "Суббота",
+    }
+    blocks = []
     for schedule in schedules:
         room = ", ".join(schedule["lesson"]["rooms"])
         teachers = schedule["lesson"]["teachers"]
         weekday = WEEKDAYS[schedule["weekday"]]
         teachers = ", ".join(decode_teachers(teachers))
+
         text += f'📝 Пара № {schedule["lesson_number"] + 1} в ⏰ {schedule["lesson"]["time_start"]}–{schedule["lesson"]["time_end"]}\n'
         text += f'📝 {schedule["lesson"]["name"]}\n'
         text += f'👥 Группы: {schedule["group"]}\n'
@@ -501,40 +490,47 @@ def format_outputs(schedules):
         text += f"🏫 Аудитории: {room}\n"
         text += f'📅 Недели: {schedule["lesson"]["weeks"]}\n'
         text += f"📆 День недели: {weekday}\n\n"
+        blocks.append(text)
+        text=""
 
-    return text
+    return blocks
 
-
-def for_telegram(text, update: Update):
-    text_len = len(text)
-    query = update.callback_query
-    for i in range(0, text_len, 4096):
-        query.edit_message_text(text[i: i + 4096])
+def telegram_delivery_optimisation (blocks: list, update:Update, context: CallbackContext):
+    text = ""
+    first = True
+    for id, block in enumerate(blocks):
+        text += block
+        if len(text+block)>=4096 or len(blocks)-1==id:
+            if first:
+                update.callback_query.edit_message_text(text)
+                first = False
+            else:
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=text
+                )
+            text = ""
     return ConversationHandler.END
-
 
 def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start, run_async=True),
-            MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True),
+            MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
         states={
-            GETNAME: [MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True)],
-            GETDAY: [CallbackQueryHandler(get_day, run_async=True)],
-            GETWEEK: [CallbackQueryHandler(week_selected_handler, run_async=True)],
-            TEACHER_CLARIFY: [CallbackQueryHandler(teacher_clarify, run_async=True)],
+            GETNAME: [MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True)],
+            GETDAY: [CallbackQueryHandler(got_day_handler, run_async=True)],
+            GETWEEK: [CallbackQueryHandler(got_week_handler, run_async=True)],
+            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)],
         },
         fallbacks=[
             CommandHandler("start", start, run_async=True),
-            MessageHandler(Filters.text & ~Filters.command, get_name, run_async=True),
+            MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
     )
 
     dispatcher.add_handler(conv_handler)
-    dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
-    dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
-    dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
     dispatcher.add_handler(CommandHandler("help", start, run_async=True))
     updater.start_polling()
 
