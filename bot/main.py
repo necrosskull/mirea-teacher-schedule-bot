@@ -1,9 +1,10 @@
 import datetime
 import logging
+import json
 import requests
 from InlineStep import EInlineStep
 import ImportantDays
-from config import TELEGRAM_TOKEN, cmstoken
+from config import TELEGRAM_TOKEN, cmstoken, grafana_token
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, \
     InputTextMessageContent
 from telegram.ext import (
@@ -17,7 +18,18 @@ from telegram.ext import (
     InlineQueryHandler,
     ChosenInlineResultHandler
 )
+import logging_loki
 
+loki_handler = logging_loki.LokiHandler(
+    url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
+    auth=("logger", grafana_token),
+    tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
+    version="1",
+)
+
+logger = logging.getLogger("bot.handlers")
+logger.setLevel("INFO")
+logger.addHandler(loki_handler)
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
@@ -36,7 +48,8 @@ def start(update: Update, context: CallbackContext) -> int:
         text="Привет!\nЯ бот, который поможет тебе найти "
              "расписание любого *преподавателя.*\nНапиши мне "
              "его фамилию"
-             " в формате:\n*Фамилия* или *Фамилия И.О.*",
+             "в формате:\n*Фамилия* или *Фамилия И.О.*\n\nВ начале семестра некоторые преподаватели могут "
+             "отсутствовать в расписании",
         parse_mode="Markdown")
 
     # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
@@ -51,6 +64,10 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :return: int сигнатура следующего состояния
     """
     inputed_teacher = update.message.text
+    logger.info(json.dumps(
+        {"type": "request", "query": inputed_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
+    )
+    )
     if len(inputed_teacher) < 2:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -64,7 +81,8 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     if teacher_schedule is None:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Преподаватель не найден\nПопробуйте еще раз")
+            text="Преподаватель не найден\nПопробуйте еще раз\n\nВ начале семестра некоторые преподаватели могут "
+                 "отсутствовать в расписании")
         return GETNAME
 
     context.user_data["schedule"] = teacher_schedule
