@@ -131,7 +131,7 @@ def got_week_handler(update: Update, context: CallbackContext) -> int:
     """
     selected_button = update.callback_query.data
     if selected_button == "back":
-        if context.user_data["available_teachers"] != None:
+        if context.user_data['available_teachers'] != None:
             return send_teacher_clarity(update, context)
         else:
             return resend_name_input(update, context)
@@ -150,8 +150,7 @@ def got_week_handler(update: Update, context: CallbackContext) -> int:
         today += 1  # Корректировка дня с 0=пн на 1=пн
         context.user_data["week"] = week
         context.user_data["day"] = today
-        send_result(update, context)
-        return GETNAME
+        return send_result(update, context)
 
     else:
         selected_week = int(selected_button)
@@ -302,6 +301,9 @@ def send_result(update: Update, context: CallbackContext):
     parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
+    if len(parsed_schedule)==0:
+        update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
+        return GETWEEK
     # Отправляем расписание преподавателя
     blocks_of_text = format_outputs(parsed_schedule)
 
