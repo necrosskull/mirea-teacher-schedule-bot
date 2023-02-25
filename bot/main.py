@@ -7,6 +7,7 @@ import ImportantDays
 from config import TELEGRAM_TOKEN, cmstoken, grafana_token
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, \
     InputTextMessageContent
+
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -198,7 +199,7 @@ def fetch_schedule_by_name(teacher_name):
     @param teacher_name: Имя преподавателя
     @return: JSON расписание или None если преподаватель не найден
     """
-    url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher_name}"
+    url = f"https://timetable.mirea.ru/api/teacher/search/{teacher_name}"
     response = requests.get(url)
     return response.json() if response.status_code == 200 else None
 
@@ -298,14 +299,14 @@ def send_result(update: Update, context: CallbackContext):
     schedule_data = context.user_data["schedule"]
     teacher_surname = context.user_data["teacher"]
 
-    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
+    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname, context)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
-    if len(parsed_schedule)==0:
+    if len(parsed_schedule) == 0:
         update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
         return GETWEEK
     # Отправляем расписание преподавателя
-    blocks_of_text = format_outputs(parsed_schedule)
+    blocks_of_text = format_outputs(parsed_schedule, context)
 
     return telegram_delivery_optimisation(blocks_of_text, update, context)
 
@@ -319,14 +320,9 @@ def check_same_surnames(teacher_schedule, surname):
     :return: surnames - лист ФИО преподавателей
     """
     surnames = []
-    schedules = teacher_schedule["schedules"]
-    for schedule in schedules:
-        teachers = schedule["lesson"]["teachers"]
-        for teacher in teachers:
-            truncated = str(teacher).replace(" ", '')
-            truncated_surname = surname.replace(' ', '')
-            if truncated not in str(surnames).replace(' ', '') and truncated_surname in truncated:
-                surnames.append(teacher)
+    for teacher in teacher_schedule:
+        if surname in teacher['name']:
+            surnames.append(teacher['name'])
     return surnames
 
 
@@ -340,11 +336,8 @@ def construct_teacher_workdays(teacher: str, week: int, schedule: list):
     @param schedule: Расписание в JSON
     @return: InlineKeyboard со стилизованными кнопками
     """
-    founded_days = []
-    for lesson in schedule['schedules']:
-        if week in lesson['lesson']['weeks']:
-            if lesson['weekday'] not in founded_days:
-                founded_days.append(lesson['weekday'])
+    founded_days = list(
+        {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons'] if week in lesson['weeks']})
 
     no_work_indicator = "🏖️"
     weekdays = {
@@ -460,17 +453,18 @@ def construct_weeks_markup():
     return reply_mark
 
 
-def parse(teacher_schedule, weekday, week_number, teacher):
-    teacher_schedule = teacher_schedule["schedules"]
-    teacher_schedule = list(filter(lambda x: teacher in str(x["lesson"]["teachers"]), teacher_schedule))
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
-    if (weekday != -1):
-        teacher_schedule = list(filter(lambda x: x["weekday"] == int(weekday), teacher_schedule))
-    teacher_schedule = list(filter(lambda x: int(week_number) in x["lesson"]["weeks"], teacher_schedule))
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_start"])
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_end"])
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
-    return teacher_schedule
+def parse(teacher_schedule, weekday, week_number, teacher, context):
+    context.user_data["teacher"] = teacher
+    for lesson in teacher_schedule:
+        teacher_schedule = lesson["lessons"]
+        teacher_schedule = sorted(teacher_schedule,
+                                  key=lambda lesson: (
+                                  lesson['weekday'], lesson['calls']['num'], lesson['group']['name']),
+                                  reverse=False)
+        if (weekday != -1):
+            teacher_schedule = list(filter(lambda lesson: lesson['weekday'] == int(weekday), teacher_schedule))
+        teacher_schedule = list(filter(lambda x: int(week_number) in x['weeks'], teacher_schedule))
+        return teacher_schedule
 
 
 def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
@@ -478,14 +472,12 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     for i in range(len(teacher_schedule)):
         for j in range(i + 1, len(teacher_schedule)):
             if (
-                    teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
-                    and teacher_schedule[i]["lesson"]["name"] == teacher_schedule[j]["lesson"]["name"]
-                    and teacher_schedule[i]["lesson"]["weeks"] == teacher_schedule[j]["lesson"]["weeks"]
-                    and teacher_schedule[i]["lesson"]["time_start"] == teacher_schedule[j]["lesson"]["time_start"]
+                    teacher_schedule[i]['calls']['num'] == teacher_schedule[j]['calls']['num'] and
+                    teacher_schedule[i]['weeks'] == teacher_schedule[j]['weeks'] and
+                    teacher_schedule[i]['weekday'] == teacher_schedule[j]['weekday']
             ):
-                teacher_schedule[i]["group"] += ", " + teacher_schedule[j]["group"]
+                teacher_schedule[i]["group"]["name"] += ", " + teacher_schedule[j]["group"]["name"]
                 remove_index.append(j)
-
     remove_index = set(remove_index)
     for i in sorted(remove_index, reverse=True):
         del teacher_schedule[i]
@@ -494,20 +486,20 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
 
 def merge_weeks_numbers(teacher_schedule):
     for i in range(len(teacher_schedule)):
-        weeks = teacher_schedule[i]["lesson"]["weeks"]
-        if weeks == list(range(1, 18)):
-            weeks = "все"
-        elif weeks == list(range(2, 18, 2)):
-            weeks = "по чётным"
-        elif weeks == list(range(1, 18, 2)):
-            weeks = "по нечётным"
+        if teacher_schedule[i]['weeks'] == list(range(1, 18)):
+            teacher_schedule[i]['weeks'] = "все"
+        elif teacher_schedule[i]['weeks'] == list(range(2, 19, 2)):
+            teacher_schedule[i]['weeks'] = "по чётным"
+        elif teacher_schedule[i]['weeks'] == list(range(1, 18, 2)):
+            teacher_schedule[i]['weeks'] = "по нечётным"
         else:
-            weeks = ", ".join(str(week) for week in weeks)
-        teacher_schedule[i]["lesson"]["weeks"] = weeks
+            teacher_schedule[i]['weeks'] = ", ".join(str(week) for week in teacher_schedule[i]['weeks'])
     return teacher_schedule
 
 
-def format_outputs(schedules):
+
+def format_outputs(schedules, context):
+    from datetime import datetime
     text = ""
     WEEKDAYS = {
         1: "Понедельник",
@@ -519,18 +511,23 @@ def format_outputs(schedules):
     }
     blocks = []
     for schedule in schedules:
-        room = ", ".join(schedule["lesson"]["rooms"])
-        teachers = schedule["lesson"]["teachers"]
-        weekday = WEEKDAYS[schedule["weekday"]]
-        teachers = ", ".join(decode_teachers(teachers))
+        room = schedule["room"]["name"]
 
-        text += f'📝 Пара № {schedule["lesson_number"] + 1} в ⏰ {schedule["lesson"]["time_start"]}–{schedule["lesson"]["time_end"]}\n'
-        text += f'📝 {schedule["lesson"]["name"]}\n'
-        text += f'👥 Группы: {schedule["group"]}\n'
-        text += f'📚 Тип: {schedule["lesson"]["types"]}\n'
+        weekday = WEEKDAYS[schedule["weekday"]]
+        teachers = ", ".join(decode_teachers([context.user_data["teacher"]]))
+
+        time_start = datetime.strptime(schedule['calls']['time_start'], "%H:%M:%S").strftime("%H:%M")
+        time_end = datetime.strptime(schedule['calls']['time_end'], "%H:%M:%S").strftime("%H:%M")
+
+        formatted_time = f"{time_start} - {time_end}"
+
+        text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
+        text += f'📝 {schedule["discipline"]["name"]}\n'
+        text += f'👥 Группы: {schedule["group"]["name"]}\n'
+        text += f'📚 Тип: {schedule["lesson_type"]["name"]}\n'
         text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
         text += f"🏫 Аудитории: {room}\n"
-        text += f'📅 Недели: {schedule["lesson"]["weeks"]}\n'
+        text += f'📅 Недели: {schedule["weeks"]}\n'
         text += f"📆 День недели: {weekday}\n\n"
         blocks.append(text)
         text = ""
