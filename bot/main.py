@@ -7,7 +7,6 @@ import ImportantDays
 from config import TELEGRAM_TOKEN, cmstoken, grafana_token
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InlineQueryResultArticle, \
     InputTextMessageContent
-
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -360,8 +359,9 @@ def construct_teacher_workdays(teacher: str, week: int, schedule: list):
         if i % 3 == 0:
             ready_markup.inline_keyboard.append(row_list)
             row_list = []
-    row_list.append(InlineKeyboardButton(text="На неделю", callback_data="week"))
-    ready_markup.inline_keyboard.append(row_list)
+    if founded_days:  # добавляем кнопку "На неделю" только если есть пары на неделе
+        row_list.append(InlineKeyboardButton(text="На неделю", callback_data="week"))
+        ready_markup.inline_keyboard.append(row_list)
     row_list = []
     row_list.append(InlineKeyboardButton(text="Назад", callback_data="back"))
     ready_markup.inline_keyboard.append(row_list)
@@ -459,7 +459,7 @@ def parse(teacher_schedule, weekday, week_number, teacher, context):
         teacher_schedule = lesson["lessons"]
         teacher_schedule = sorted(teacher_schedule,
                                   key=lambda lesson: (
-                                  lesson['weekday'], lesson['calls']['num'], lesson['group']['name']),
+                                      lesson['weekday'], lesson['calls']['num'], lesson['group']['name']),
                                   reverse=False)
         if (weekday != -1):
             teacher_schedule = list(filter(lambda lesson: lesson['weekday'] == int(weekday), teacher_schedule))
@@ -497,8 +497,7 @@ def merge_weeks_numbers(teacher_schedule):
     return teacher_schedule
 
 
-
-def format_outputs(schedules, context):
+def format_outputs(parsed_schedule, context):
     from datetime import datetime
     text = ""
     WEEKDAYS = {
@@ -510,7 +509,7 @@ def format_outputs(schedules, context):
         6: "Суббота",
     }
     blocks = []
-    for schedule in schedules:
+    for schedule in parsed_schedule:
         room = schedule["room"]["name"]
 
         weekday = WEEKDAYS[schedule["weekday"]]
