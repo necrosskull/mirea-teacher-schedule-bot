@@ -367,8 +367,9 @@ def construct_teacher_workdays(teacher: str, week: int, schedule: list):
         if i % 3 == 0:
             ready_markup.inline_keyboard.append(row_list)
             row_list = []
-    row_list.append(InlineKeyboardButton(text="На неделю", callback_data="week"))
-    ready_markup.inline_keyboard.append(row_list)
+    if founded_days:  # добавляем кнопку "На неделю" только если есть пары на неделе
+        row_list.append(InlineKeyboardButton(text="На неделю", callback_data="week"))
+        ready_markup.inline_keyboard.append(row_list)
     row_list = []
     row_list.append(InlineKeyboardButton(text="Назад", callback_data="back"))
     ready_markup.inline_keyboard.append(row_list)

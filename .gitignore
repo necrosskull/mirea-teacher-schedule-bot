@@ -168,3 +168,5 @@ bot/exams.json
 bot/inlinebot.py
 bot/rassilka.py
 exams.json
+rassilka.py
+test2.py
