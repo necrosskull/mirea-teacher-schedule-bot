@@ -54,7 +54,7 @@ dispatcher = updater.dispatcher
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY = range(4)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
 
 
 # Handlers
@@ -195,7 +195,7 @@ def got_day_handler(update: Update, context: CallbackContext):
         selected_day = int(selected_button)
     context.user_data["day"] = selected_day
     send_result(update, context)
-    return GETNAME
+    return BACK
 
 
 # End Handlers
@@ -354,6 +354,7 @@ def construct_teacher_workdays(teacher: str, week: int, schedule: list):
     @param schedule: Расписание в JSON
     @return: InlineKeyboard со стилизованными кнопками
     """
+
     founded_days = list(
         {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons'] if week in lesson['weeks']})
 
@@ -560,7 +561,8 @@ def telegram_delivery_optimisation(blocks: list, update: Update, context: Callba
         text += block
         if len(text + block) >= 4096 or len(blocks) - 1 == id:
             if first:
-                update.callback_query.edit_message_text(text)
+                back_button = InlineKeyboardMarkup([[InlineKeyboardButton(text="Назад", callback_data="back")]])
+                update.callback_query.edit_message_text(text, reply_markup=back_button)
                 first = False
             else:
                 context.bot.send_message(
@@ -568,7 +570,16 @@ def telegram_delivery_optimisation(blocks: list, update: Update, context: Callba
                     text=text
                 )
             text = ""
-    return ConversationHandler.END
+    return BACK
+
+
+def got_back_handler(update: Update, context: CallbackContext):
+    query = update.callback_query.data
+    if query == "back":
+        # Заново получаем расписание, т.к. список недель был заменён на строки "По чётным", "По нечётным" и т.д.
+        context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+
+        return send_week_selector(update, context)
 
 
 def main():
@@ -582,6 +593,7 @@ def main():
             GETDAY: [CallbackQueryHandler(got_day_handler, run_async=True)],
             GETWEEK: [CallbackQueryHandler(got_week_handler, run_async=True)],
             TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)],
+            BACK: [CallbackQueryHandler(got_back_handler, run_async=True)],
         },
         fallbacks=[
             CommandHandler("start", start, run_async=True),
