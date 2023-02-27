@@ -97,7 +97,7 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
     teacher_schedule = fetch_schedule_by_name(teacher)
 
-    if teacher_schedule is None:
+    if teacher_schedule is None or teacher_schedule == list([]):
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Преподаватель не найден\nПопробуйте еще раз\n\nВ начале семестра некоторые преподаватели могут "
