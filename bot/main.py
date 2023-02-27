@@ -535,6 +535,10 @@ def format_outputs(parsed_schedule, context):
             campus = schedule["room"]["campus"]["short_name"] if schedule["room"]["campus"] and \
                                                                  schedule["room"]["campus"][
                                                                      "short_name"] else ""
+            if campus != "":
+                room = f"{room} ({campus})"
+            else:
+                room = f"{room}"
 
             weekday = WEEKDAYS[schedule["weekday"]]
             teachers = ", ".join(decode_teachers([context.user_data["teacher"]]))
@@ -549,7 +553,7 @@ def format_outputs(parsed_schedule, context):
             text += f'👥 Группы: {schedule["group"]["name"]}\n'
             text += f'📚 Тип: {schedule["lesson_type"]["name"]}\n'
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
-            text += f"🏫 Аудитории: {room} {campus}\n"
+            text += f"🏫 Аудитории: {room}\n"
             text += f'📅 Недели: {schedule["weeks"]}\n'
             text += f"📆 День недели: {weekday}\n\n"
             blocks.append(text)
