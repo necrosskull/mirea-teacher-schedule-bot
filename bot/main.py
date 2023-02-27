@@ -530,26 +530,35 @@ def format_outputs(parsed_schedule, context):
     }
     blocks = []
     for schedule in parsed_schedule:
-        room = schedule["room"]["name"]
+        try:
+            room = schedule["room"]["name"]
+            campus = schedule["room"]["campus"]["short_name"] if schedule["room"]["campus"] and \
+                                                                 schedule["room"]["campus"][
+                                                                     "short_name"] else ""
 
-        weekday = WEEKDAYS[schedule["weekday"]]
-        teachers = ", ".join(decode_teachers([context.user_data["teacher"]]))
+            weekday = WEEKDAYS[schedule["weekday"]]
+            teachers = ", ".join(decode_teachers([context.user_data["teacher"]]))
 
-        time_start = datetime.strptime(schedule['calls']['time_start'], "%H:%M:%S").strftime("%H:%M")
-        time_end = datetime.strptime(schedule['calls']['time_end'], "%H:%M:%S").strftime("%H:%M")
+            time_start = datetime.strptime(schedule['calls']['time_start'], "%H:%M:%S").strftime("%H:%M")
+            time_end = datetime.strptime(schedule['calls']['time_end'], "%H:%M:%S").strftime("%H:%M")
 
-        formatted_time = f"{time_start} - {time_end}"
+            formatted_time = f"{time_start} - {time_end}"
 
-        text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
-        text += f'📝 {schedule["discipline"]["name"]}\n'
-        text += f'👥 Группы: {schedule["group"]["name"]}\n'
-        text += f'📚 Тип: {schedule["lesson_type"]["name"]}\n'
-        text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
-        text += f"🏫 Аудитории: {room}\n"
-        text += f'📅 Недели: {schedule["weeks"]}\n'
-        text += f"📆 День недели: {weekday}\n\n"
-        blocks.append(text)
-        text = ""
+            text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
+            text += f'📝 {schedule["discipline"]["name"]}\n'
+            text += f'👥 Группы: {schedule["group"]["name"]}\n'
+            text += f'📚 Тип: {schedule["lesson_type"]["name"]}\n'
+            text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
+            text += f"🏫 Аудитории: {room} {campus}\n"
+            text += f'📅 Недели: {schedule["weeks"]}\n'
+            text += f"📆 День недели: {weekday}\n\n"
+            blocks.append(text)
+            text = ""
+        except:
+            text += "Ошибка при получении расписания, сообщите об этом администрации в чате " \
+                    "https://t.me/mirea_ninja_chat"
+            blocks.append(text)
+            text = ""
 
     return blocks
 
