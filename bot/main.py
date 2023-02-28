@@ -82,47 +82,48 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
-    inputed_teacher = update.message.text
+    inputted_teacher = update.message.text
     lazy_logger.info(json.dumps(
-        {"type": "request", "query": inputed_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
+        {"type": "request", "query": inputted_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
     )
     )
-    if len(inputed_teacher) < 2:
+    if len(inputted_teacher) < 2:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Слишком короткий запрос\nПопробуйте еще раз")
         return GETNAME
-    teacher = normalize_teachername(inputed_teacher)
+    teacher = normalize_teachername(inputted_teacher)
 
     # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
     teacher_schedule = fetch_schedule_by_name(teacher)
+    if teacher_schedule:
 
-    if teacher_schedule is None or teacher_schedule == list([]):
+        context.user_data["schedule"] = teacher_schedule
+        available_teachers = check_same_surnames(teacher_schedule, teacher)
+
+        if len(available_teachers) > 1:
+            context.user_data["available_teachers"] = available_teachers
+            return send_teacher_clarity(update, context, True)
+
+        elif len(available_teachers) == 0:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Ошибка при определении ФИО преподавателя. Повторите попытку, изменив запрос.\n" +
+                     "Например введите только фамилию преподавателя."
+            )
+            return GETNAME
+
+        else:
+            context.user_data["available_teachers"] = None
+            context.user_data['teacher'] = available_teachers[0]
+            return send_week_selector(update, context, True)
+
+    else:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Преподаватель не найден\nПопробуйте еще раз\n\nВ начале семестра некоторые преподаватели могут "
                  "отсутствовать в расписании")
         return GETNAME
-
-    context.user_data["schedule"] = teacher_schedule
-    available_teachers = check_same_surnames(teacher_schedule, teacher)
-
-    if len(available_teachers) > 1:
-        context.user_data["available_teachers"] = available_teachers
-        return send_teacher_clarity(update, context, True)
-
-    elif len(available_teachers) == 0:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Ошибка при определении ФИО преподавателя. Повторите попытку, изменив запрос.\n" +
-                 "Например введите только фамилию преподавателя."
-        )
-        return GETNAME
-
-    else:
-        context.user_data["available_teachers"] = None
-        context.user_data['teacher'] = available_teachers[0]
-        return send_week_selector(update, context, True)
 
 
 def got_teacher_clarification_handler(update: Update, context: CallbackContext):
@@ -150,7 +151,7 @@ def got_week_handler(update: Update, context: CallbackContext) -> int:
     """
     selected_button = update.callback_query.data
     if selected_button == "back":
-        if context.user_data['available_teachers'] != None:
+        if context.user_data['available_teachers'] is not None:
             return send_teacher_clarity(update, context)
         else:
             return resend_name_input(update, context)
