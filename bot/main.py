@@ -547,7 +547,7 @@ def format_outputs(parsed_schedule, context):
             time_start = datetime.strptime(schedule['calls']['time_start'], "%H:%M:%S").strftime("%H:%M")
             time_end = datetime.strptime(schedule['calls']['time_end'], "%H:%M:%S").strftime("%H:%M")
 
-            formatted_time = f"{time_start} - {time_end}"
+            formatted_time = f"{time_start} – {time_end}"
 
             text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
             text += f'📝 {schedule["discipline"]["name"]}\n'
@@ -657,12 +657,6 @@ def inline_dispatcher(update: Update, context: CallbackContext):
         target = got_week_handler(update, context)
         if target == GETDAY:
             context.user_data["inline_step"] = EInlineStep.ask_day
-        elif target == GETWEEK or target == ConversationHandler.END:
-            return
-        else:
-            update.callback_query.edit_message_text("Вызовите бота снова, указав нужного преподавателя")
-            context.user_data["inline_step"] = EInlineStep.ask_teacher
-        return
     if status == EInlineStep.ask_day:
         target = got_day_handler(update, context)
         if target == GETWEEK:
