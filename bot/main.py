@@ -294,7 +294,7 @@ def send_day_selector(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Статус следующего шага - GETDAY
     """
-    teacher = context.user_data["teacher"]
+    teacher = ", ".join(decode_teachers([context.user_data["teacher"]]))
     week = context.user_data["week"]
     schedule = context.user_data["schedule"]
     teacher_workdays = construct_teacher_workdays(teacher, week, schedule)
