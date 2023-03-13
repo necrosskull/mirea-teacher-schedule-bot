@@ -151,7 +151,6 @@ def got_week_handler(update: Update, context: CallbackContext) -> int:
     """
     selected_button = update.callback_query.data
     if selected_button == "back":
-        print(context.user_data['available_teachers'])
         if context.user_data['available_teachers'] is not None:
             return send_teacher_clarity(update, context)
         else:
@@ -533,10 +532,9 @@ def format_outputs(parsed_schedule, context):
     blocks = []
     for schedule in parsed_schedule:
         try:
-            room = schedule["room"]["name"]
-            campus = schedule["room"]["campus"]["short_name"] if schedule["room"]["campus"] and \
-                                                                 schedule["room"]["campus"][
-                                                                     "short_name"] else ""
+            room = schedule["room"]["name"] if schedule["room"] is not None else ""
+            campus = schedule["room"]["campus"]["short_name"] if schedule["room"] and \
+                                                                 schedule["room"]["campus"] else ""
             if campus != "":
                 room = f"{room} ({campus})"
             else:
@@ -549,11 +547,11 @@ def format_outputs(parsed_schedule, context):
             time_end = datetime.strptime(schedule['calls']['time_end'], "%H:%M:%S").strftime("%H:%M")
 
             formatted_time = f"{time_start} – {time_end}"
-
+            type = schedule["lesson_type"]["name"] if schedule["lesson_type"] else ""
             text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
             text += f'📝 {schedule["discipline"]["name"]}\n'
             text += f'👥 Группы: {schedule["group"]["name"]}\n'
-            text += f'📚 Тип: {schedule["lesson_type"]["name"]}\n'
+            text += f'📚 Тип: {type}\n'
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
             text += f"🏫 Аудитории: {room}\n"
             text += f'📅 Недели: {schedule["weeks"]}\n'
