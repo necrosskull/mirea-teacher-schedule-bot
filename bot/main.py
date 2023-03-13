@@ -603,6 +603,13 @@ def inlinequery(update: Update, context: CallbackContext):
     query = update.inline_query.query
     if not query:
         return
+    if len(query) < 3:
+        return
+    lazy_logger.info(json.dumps(
+        {"type": "query",
+         "queryId": update.inline_query.id,
+         "query": query.lower(),
+         **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
     query = query.title()
     if " " not in query:
         query += " "
