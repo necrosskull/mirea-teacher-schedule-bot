@@ -151,6 +151,7 @@ def got_week_handler(update: Update, context: CallbackContext) -> int:
     """
     selected_button = update.callback_query.data
     if selected_button == "back":
+        print(context.user_data['available_teachers'])
         if context.user_data['available_teachers'] is not None:
             return send_teacher_clarity(update, context)
         else:
@@ -258,7 +259,7 @@ def resend_name_input(update: Update, context: CallbackContext):
     @return: Статус следующего шага - GETNAME
     """
     update.callback_query.edit_message_text(
-        text=f"Введите снова нужную фамлию преподавателя."
+        text=f"Введите снова нужную фамилию преподавателя."
     )
     return GETNAME
 
@@ -653,16 +654,20 @@ def inline_dispatcher(update: Update, context: CallbackContext):
         deny_inline_usage(update)
         return
     if status == EInlineStep.ask_week:
+        context.user_data['available_teachers'] = None
         context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
         target = got_week_handler(update, context)
         if target == GETDAY:
             context.user_data["inline_step"] = EInlineStep.ask_day
+        elif target == BACK:
+            context.user_data["inline_step"] = EInlineStep.ask_day
     if status == EInlineStep.ask_day:
         target = got_day_handler(update, context)
         if target == GETWEEK:
+            context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
             context.user_data["inline_step"] = EInlineStep.ask_week
-        elif target != GETDAY:
-            context.user_data["inline_step"] = EInlineStep.completed
+        elif target == BACK:
+            context.user_data["inline_step"] = EInlineStep.ask_day
         return
 
 
