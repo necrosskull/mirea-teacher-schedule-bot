@@ -262,10 +262,7 @@ def resend_name_input(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Статус следующего шага - GETNAME
     """
-    update.callback_query.edit_message_text(
-        text=f"Введите снова нужную фамилию преподавателя."
-    )
-    return GETNAME
+    update.callback_query.answer(text="Введите новую фамилию", show_alert=True)
 
 
 def send_teacher_clarity(update: Update, context: CallbackContext, firsttime=False):
@@ -649,6 +646,7 @@ def answer_inline_handler(update: Update, context: CallbackContext):
     if update.chosen_inline_result is not None:
         context.user_data["teacher"] = update.chosen_inline_result.result_id
         context.user_data["inline_step"] = EInlineStep.ask_week
+        context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
         return
 
 
@@ -657,6 +655,11 @@ def inline_dispatcher(update: Update, context: CallbackContext):
     Обработка вызовов в чатах на основании Callback вызова
     """
     if "inline_step" not in context.user_data:
+        deny_inline_usage(update)
+        return
+    # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
+    # меню, то отказываем в обработке
+    if update.callback_query.inline_message_id and update.callback_query.inline_message_id != context.user_data["inline_message_id"]:
         deny_inline_usage(update)
         return
     status = context.user_data["inline_step"]
@@ -685,7 +688,7 @@ def deny_inline_usage(update: Update):
     """
     Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
     """
-    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. его вызвал другой человек",
+    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. оно не относится к вашему запросу",
                                  show_alert=True)
     return
 
