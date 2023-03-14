@@ -573,6 +573,7 @@ def telegram_delivery_optimisation(blocks: list, update: Update, context: Callba
             text = ""
     return BACK
 
+
 def got_back_handler(update: Update, context: CallbackContext):
     query = update.callback_query.data
     if query == "back":
@@ -580,6 +581,8 @@ def got_back_handler(update: Update, context: CallbackContext):
         context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
 
         return send_week_selector(update, context)
+
+
 def inlinequery(update: Update, context: CallbackContext):
     """
     Обработчик инлайн запросов
@@ -642,7 +645,8 @@ def inline_dispatcher(update: Update, context: CallbackContext):
         return
     # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
     # меню, то отказываем в обработке
-    if update.callback_query.inline_message_id and update.callback_query.inline_message_id != context.user_data["inline_message_id"]:
+    if update.callback_query.inline_message_id and update.callback_query.inline_message_id != context.user_data[
+        "inline_message_id"]:
         deny_inline_usage(update)
         return
     status = context.user_data["inline_step"]
@@ -674,6 +678,7 @@ def deny_inline_usage(update: Update):
     update.callback_query.answer(text="Вы не можете использовать это меню, т.к. оно не относится к вашему запросу",
                                  show_alert=True)
     return
+
 
 def main():
     conv_handler = ConversationHandler(
