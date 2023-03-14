@@ -20,16 +20,35 @@ from telegram.ext import (
 )
 import logging_loki
 
-loki_handler = logging_loki.LokiHandler(
-    url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
-    auth=("logger", grafana_token),
-    tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
-    version="1",
-)
 
-logger = logging.getLogger("bot.handlers")
-logger.setLevel("INFO")
-logger.addHandler(loki_handler)
+class LazyLogger:
+    def __init__(self):
+        self.logger = None
+
+    def init_logger(self, grafana_token):
+        if grafana_token:
+            loki_handler = logging_loki.LokiHandler(
+                url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
+                auth=("logger", grafana_token),
+                tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
+                version="1",
+            )
+
+            self.logger = logging.getLogger("bot.handlers")
+            self.logger.setLevel("INFO")
+            self.logger.addHandler(loki_handler)
+        else:
+            self.logger = logging.getLogger("bot.handlers")
+            self.logger.setLevel("INFO")
+
+    def __getattr__(self, attr):
+        if not self.logger:
+            self.init_logger(grafana_token)
+        return getattr(self.logger, attr)
+
+
+lazy_logger = LazyLogger()
+
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
@@ -64,7 +83,7 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :return: int сигнатура следующего состояния
     """
     inputed_teacher = update.message.text
-    logger.info(json.dumps(
+    lazy_logger.info(json.dumps(
         {"type": "request", "query": inputed_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
     )
     )
@@ -301,7 +320,7 @@ def send_result(update: Update, context: CallbackContext):
     parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
-    if len(parsed_schedule)==0:
+    if len(parsed_schedule) == 0:
         update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
         return GETWEEK
     # Отправляем расписание преподавателя
