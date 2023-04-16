@@ -20,22 +20,41 @@ from telegram.ext import (
 )
 import logging_loki
 
-loki_handler = logging_loki.LokiHandler(
-    url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
-    auth=("logger", grafana_token),
-    tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
-    version="1",
-)
 
-logger = logging.getLogger("bot.handlers")
-logger.setLevel("INFO")
-logger.addHandler(loki_handler)
+class LazyLogger:
+    def __init__(self):
+        self.logger = None
+
+    def init_logger(self, grafana_token):
+        if grafana_token:
+            loki_handler = logging_loki.LokiHandler(
+                url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
+                auth=("logger", grafana_token),
+                tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
+                version="1",
+            )
+
+            self.logger = logging.getLogger("bot.handlers")
+            self.logger.setLevel("INFO")
+            self.logger.addHandler(loki_handler)
+        else:
+            self.logger = logging.getLogger("bot.handlers")
+            self.logger.setLevel("INFO")
+
+    def __getattr__(self, attr):
+        if not self.logger:
+            self.init_logger(grafana_token)
+        return getattr(self.logger, attr)
+
+
+lazy_logger = LazyLogger()
+
 updater = Updater(TELEGRAM_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY = range(4)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
 
 
 # Handlers
@@ -64,7 +83,7 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :return: int сигнатура следующего состояния
     """
     inputed_teacher = update.message.text
-    logger.info(json.dumps(
+    lazy_logger.info(json.dumps(
         {"type": "request", "query": inputed_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
     )
     )
@@ -176,7 +195,7 @@ def got_day_handler(update: Update, context: CallbackContext):
         selected_day = int(selected_button)
     context.user_data["day"] = selected_day
     send_result(update, context)
-    return GETNAME
+    return BACK
 
 
 # End Handlers
@@ -237,10 +256,7 @@ def resend_name_input(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Статус следующего шага - GETNAME
     """
-    update.callback_query.edit_message_text(
-        text=f"Введите снова нужную фамлию преподавателя."
-    )
-    return GETNAME
+    update.callback_query.answer(text="Введите новую фамилию", show_alert=True)
 
 
 def send_teacher_clarity(update: Update, context: CallbackContext, firsttime=False):
@@ -274,7 +290,7 @@ def send_day_selector(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Статус следующего шага - GETDAY
     """
-    teacher = context.user_data["teacher"]
+    teacher = ", ".join(decode_teachers([context.user_data["teacher"]]))
     week = context.user_data["week"]
     schedule = context.user_data["schedule"]
     teacher_workdays = construct_teacher_workdays(teacher, week, schedule)
@@ -301,7 +317,7 @@ def send_result(update: Update, context: CallbackContext):
     parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
-    if len(parsed_schedule)==0:
+    if len(parsed_schedule) == 0:
         update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
         return GETWEEK
     # Отправляем расписание преподавателя
@@ -525,7 +541,7 @@ def format_outputs(schedules):
         weekday = WEEKDAYS[schedule["weekday"]]
         teachers = ", ".join(decode_teachers(teachers))
 
-        text += f'📝 Пара № {schedule["lesson_number"] + 1} в ⏰ {schedule["lesson"]["time_start"]}–{schedule["lesson"]["time_end"]}\n'
+        text += f'📝 Пара № {schedule["lesson_number"] + 1} в ⏰ {schedule["lesson"]["time_start"]} – {schedule["lesson"]["time_end"]}\n'
         text += f'📝 {schedule["lesson"]["name"]}\n'
         text += f'👥 Группы: {schedule["group"]}\n'
         text += f'📚 Тип: {schedule["lesson"]["types"]}\n'
@@ -546,7 +562,8 @@ def telegram_delivery_optimisation(blocks: list, update: Update, context: Callba
         text += block
         if len(text + block) >= 4096 or len(blocks) - 1 == id:
             if first:
-                update.callback_query.edit_message_text(text)
+                back_button = InlineKeyboardMarkup([[InlineKeyboardButton(text="Назад", callback_data="back")]])
+                update.callback_query.edit_message_text(text, reply_markup=back_button)
                 first = False
             else:
                 context.bot.send_message(
@@ -554,7 +571,113 @@ def telegram_delivery_optimisation(blocks: list, update: Update, context: Callba
                     text=text
                 )
             text = ""
-    return ConversationHandler.END
+    return BACK
+
+
+def got_back_handler(update: Update, context: CallbackContext):
+    query = update.callback_query.data
+    if query == "back":
+        # Заново получаем расписание, т.к. список недель был заменён на строки "По чётным", "По нечётным" и т.д.
+        context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+
+        return send_week_selector(update, context)
+
+
+def inlinequery(update: Update, context: CallbackContext):
+    """
+    Обработчик инлайн запросов
+    Создает Inline отображение
+    """
+    query = update.inline_query.query
+    if not query:
+        return
+    if len(query) < 3:
+        return
+    lazy_logger.info(json.dumps(
+        {"type": "query",
+         "queryId": update.inline_query.id,
+         "query": query.lower(),
+         **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
+    query = query.title()
+    if " " not in query:
+        query += " "
+    teacher_schedule = fetch_schedule_by_name(query)
+    if teacher_schedule is None:
+        return
+    surnames = check_same_surnames(teacher_schedule, query)
+    if len(surnames) == 0:
+        return
+    inline_results = []
+    decoded_surnames = decode_teachers(surnames)
+    userid = str(update.inline_query.from_user.id)
+    for surname, decoded_surname in zip(surnames, decoded_surnames):
+        inline_results.append(InlineQueryResultArticle(
+            id=surname,
+            title=decoded_surname,
+            description="Нажми, чтобы посмотреть расписание",
+            input_message_content=InputTextMessageContent(
+                message_text=f"Выбран преподаватель: {decoded_surname}!"
+            ),
+            reply_markup=construct_weeks_markup(),
+
+        ))
+    update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
+
+
+def answer_inline_handler(update: Update, context: CallbackContext):
+    """
+    В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
+    и выставляет текущий шаг Inline запроса на ask_day
+    """
+    if update.chosen_inline_result is not None:
+        context.user_data["teacher"] = update.chosen_inline_result.result_id
+        context.user_data["inline_step"] = EInlineStep.ask_week
+        context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
+        return
+
+
+def inline_dispatcher(update: Update, context: CallbackContext):
+    """
+    Обработка вызовов в чатах на основании Callback вызова
+    """
+    if "inline_step" not in context.user_data:
+        deny_inline_usage(update)
+        return
+    # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
+    # меню, то отказываем в обработке
+    if update.callback_query.inline_message_id and update.callback_query.inline_message_id != context.user_data[
+        "inline_message_id"]:
+        deny_inline_usage(update)
+        return
+    status = context.user_data["inline_step"]
+    if status == EInlineStep.completed or status == EInlineStep.ask_teacher:
+        deny_inline_usage(update)
+        return
+    if status == EInlineStep.ask_week:
+        context.user_data['available_teachers'] = None
+        context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+        target = got_week_handler(update, context)
+        if target == GETDAY:
+            context.user_data["inline_step"] = EInlineStep.ask_day
+        elif target == BACK:
+            context.user_data["inline_step"] = EInlineStep.ask_day
+    if status == EInlineStep.ask_day:
+        target = got_day_handler(update, context)
+        if target == GETWEEK:
+            context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+            context.user_data["inline_step"] = EInlineStep.ask_week
+        elif target == BACK:
+            context.user_data["inline_step"] = EInlineStep.ask_day
+        return
+
+
+def deny_inline_usage(update: Update):
+    """
+    Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
+    """
+    update.callback_query.answer(text="Вы не можете использовать это меню, т.к. оно не относится к вашему запросу",
+                                 show_alert=True)
+    return
 
 
 def main():
@@ -568,6 +691,7 @@ def main():
             GETDAY: [CallbackQueryHandler(got_day_handler, run_async=True)],
             GETWEEK: [CallbackQueryHandler(got_week_handler, run_async=True)],
             TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)],
+            BACK: [CallbackQueryHandler(got_back_handler, run_async=True)],
         },
         fallbacks=[
             CommandHandler("start", start, run_async=True),
@@ -576,6 +700,11 @@ def main():
     )
 
     dispatcher.add_handler(conv_handler)
+
+    dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
+    dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
+    dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
+
     dispatcher.add_handler(CommandHandler("help", start, run_async=True))
     updater.start_polling()
 
