@@ -563,26 +563,37 @@ def format_outputs(schedules):
 
 
 def telegram_delivery_optimisation(blocks: list, update: Update, context: CallbackContext):
-    text = ""
-    first = True
-    for id, block in enumerate(blocks):
-        text += block
-        if len(text + block) >= 4096 or len(blocks) - 1 == id:
-            if first:
-                teacher = context.user_data["teacher"]
-                context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
-                schedule = context.user_data["schedule"]
-                week = context.user_data["week"]
-                teacher_workdays = construct_teacher_workdays(teacher, week, schedule)
-                update.callback_query.edit_message_text(text, reply_markup=teacher_workdays)
-                first = False
+    teacher = context.user_data["teacher"]
+    context.user_data["schedule"] = fetch_schedule_by_name(context.user_data["teacher"])
+    schedule = context.user_data["schedule"]
+    week = context.user_data["week"]
+    teacher_workdays = construct_teacher_workdays(teacher, week, schedule)
 
+    chunk = ""
+    first = True
+    for block in blocks:
+        if len(chunk) + len(block) <= 4096:
+            chunk += block
+        else:
+            if first:
+                if update.callback_query.inline_message_id:
+                    update.callback_query.answer(
+                        text="Слишком длинное расписание, пожалуйста, воспользуйтесь личными сообщениями бота или "
+                             "выберите конкретный день недели",
+                        show_alert=True)
+                    break
+                update.callback_query.edit_message_text(chunk)
+                first = False
             else:
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=text
-                )
-            text = ""
+                context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+            chunk = block
+
+    if chunk:
+        if first:
+            update.callback_query.edit_message_text(chunk, reply_markup=teacher_workdays)
+        else:
+            context.bot.send_message(chat_id=update.effective_chat.id, text=chunk, reply_markup=teacher_workdays)
+
     return GETDAY
 
 
