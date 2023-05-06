@@ -4,7 +4,7 @@
 ## О проекте
 Проект представляет собой бота для телеграма, который позволяет получать расписание `преподавателей РТУ МИРЭА.`
 
-Проект написан на языке `Python` с использованием библиотеки `python-telegram-bot 13.X.`
+Проект написан на языке `Python` с использованием библиотеки `python-telegram-bot 13.15.`
 
 Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-timetable), который предоставляет расписание в формате `JSON.`
 
@@ -30,9 +30,9 @@ poetry run python bot/main.py
 Чтобы запустить это приложение с помощью docker, для начала вам необходимо собрать локальный образ контейнера:
 
 ```bash
-docker build -t telegram_bot .
+docker build -t schedule_bot .
 ``` 
 
 ```bash
-docker run --restart on-failure -e TELEGRAM_TOKEN=<TELEGRAM_TOKEN> -t telegram_bot
+docker run --name schedule_bot --env-file .env schedule_bot
 ```
