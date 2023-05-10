@@ -430,7 +430,10 @@ def decode_teachers(rawNames):
         decoded_names = decoded_names
     else:
         decoded_names = rawNames
-    return decoded_names
+    if len(decoded_names) == len(rawNames):
+        return decoded_names
+    else:
+        return rawNames
 
 
 def prepare_teacher_markup(teachers):
