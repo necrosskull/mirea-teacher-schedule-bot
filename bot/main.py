@@ -593,7 +593,7 @@ def format_outputs(parsed_schedule, context):
                 blocks.append(text)
                 text = ""
 
-        return blocks
+    return blocks
 
 
 def telegram_delivery_optimisation(blocks: list, update: Update, context: CallbackContext):
