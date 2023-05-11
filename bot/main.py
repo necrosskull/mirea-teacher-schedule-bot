@@ -32,7 +32,7 @@ class LazyLogger:
             loki_handler = logging_loki.LokiHandler(
                 url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
                 auth=("logger", grafana_token),
-                tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
+                tags={"app": "mirea-teacher-schedule-bot", "env": "apiv2t"},
                 version="1",
             )
 
