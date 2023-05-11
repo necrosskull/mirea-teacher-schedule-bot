@@ -546,6 +546,7 @@ def format_outputs(parsed_schedule, context):
     }
     blocks = []
     for schedule in parsed_schedule:
+        error_message = None
         try:
             room = schedule["room"]["name"] if schedule["room"] is not None else ""
             campus = schedule["room"]["campus"]["short_name"] if schedule["room"] and \
@@ -573,13 +574,26 @@ def format_outputs(parsed_schedule, context):
             text += f"📆 День недели: {weekday}\n\n"
             blocks.append(text)
             text = ""
-        except:
-            text += "Ошибка при получении расписания, сообщите об этом администрации в чате " \
-                    "https://t.me/mirea_ninja_chat"
-            blocks.append(text)
-            text = ""
+        except Exception as e:
+            if str(e) == error_message:
+                lazy_logger.error(json.dumps(
+                    {"type": "error",
+                     "teacher": context.user_data['teacher'],
+                     "week": context.user_data['week'],
+                     }, ensure_ascii=False))
+            else:
+                error_message = str(e)
+                lazy_logger.error(json.dumps(
+                    {"type": "error",
+                     "teacher": context.user_data['teacher'],
+                     "week": context.user_data['week'],
+                     }, ensure_ascii=False))
+                text += "Ошибка при получении расписания, сообщите об этом администрации в чате " \
+                        "https://t.me/mirea_ninja_chat"
+                blocks.append(text)
+                text = ""
 
-    return blocks
+        return blocks
 
 
 def telegram_delivery_optimisation(blocks: list, update: Update, context: CallbackContext):
