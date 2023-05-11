@@ -350,7 +350,10 @@ def check_same_surnames(teacher_schedule, surname):
     surnames = []
     for teacher in teacher_schedule:
         if surname in teacher['name']:
+            if teacher['name'][-1] != ".":
+                teacher['name'] += "."
             surnames.append(teacher['name'])
+            surnames = list(set(surnames))
     return surnames
 
 
