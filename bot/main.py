@@ -32,7 +32,7 @@ class LazyLogger:
             loki_handler = logging_loki.LokiHandler(
                 url="https://loki.grafana.mirea.ninja/loki/api/v1/push",
                 auth=("logger", grafana_token),
-                tags={"app": "mirea-teacher-schedule-bot", "env": "apiv2t"},
+                tags={"app": "mirea-teacher-schedule-bot", "env": "production"},
                 version="1",
             )
 
@@ -66,15 +66,14 @@ def start(update: Update, context: CallbackContext) -> int:
     """
     context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Привет!\nЯ бот, который поможет тебе найти "
-             "расписание любого *преподавателя.*\nНапиши мне "
+        text="Привет!\nЯ бот, который поможет вам найти "
+             "расписание любого *преподавателя.*\nНапишите мне "
              "его фамилию "
-             "в формате:\n*Фамилия* или *Фамилия И.О.*\n\n"
-             "Тестируется API и inline-режим работы бота, для использования inline-режима "
-             "наберите *@apiv2t_bot* + *фамилию* в любом чате и нажмите на кнопку c фамилией преподавателя.\n\n"
-             "Разработка нового API еще в процессе, "
-             "если вы заметили какие-то ошибки, пожалуйста, напишите мне в чате *https://t.me/mirea_ninja_chat*\n"
-             "@titaniumbakup",
+             "в формате:\n*Иванов* или *Иванов И.И.*\n\n"
+             "Также вы можете использовать inline-режим, "
+             "для этого в любом чате наберите *@teacherschedulertu_bot* + *фамилию* и нажмите на кнопку с фамилией "
+             "преподавателя.\n\n"
+             "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!",
         parse_mode="Markdown")
 
     # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
@@ -115,7 +114,8 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text="Ошибка при определении ФИО преподавателя. Повторите попытку, изменив запрос.\n" +
-                     "Например введите только фамилию преподавателя."
+                     "Например введите только фамилию преподавателя.\n\n"
+                     "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!", parse_mode="Markdown"
             )
             return GETNAME
 
@@ -127,9 +127,9 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     else:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Преподаватель не найден\nПопробуйте еще раз\n\nРазработка нового API еще в процессе, "
-                 "если вы заметили какие-то ошибки, пожалуйста, напишите мне в чате *https://t.me/mirea_ninja_chat*\n"
-                 "@titaniumbakup", parse_mode="Markdown")
+            text="Преподаватель не найден\nПопробуйте еще раз\n\nУбедитесь, что преподаватель указан в формате "
+                 "*Иванов* или *Иванов И.И.*\n\n"
+                 "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!", parse_mode="Markdown")
         return GETNAME
 
 
