@@ -60,20 +60,32 @@ GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
 
 
 # Handlers
-def start(update: Update, context: CallbackContext) -> int:
+def start(update: Update, context: CallbackContext):
     """
     Привествие бота при использовании команды /start
     """
     context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Привет!\nЯ бот, который поможет тебе найти "
-             "расписание любого *преподавателя.*\nНапиши мне "
+        text="Привет!\nЯ бот, который поможет вам найти "
+             "расписание любого *преподавателя.*\nНапишите мне "
              "его фамилию "
-             "в формате:\n*Фамилия* или *Фамилия И.О.* поддерживаются только инициалы!",
+             "в формате:\n*Иванов* или *Иванов И.И.*\n\n"
+             "Также вы можете использовать inline-режим, "
+             "для этого в любом чате наберите *@teacherschedulertu_bot* + *фамилию* и нажмите на кнопку с фамилией "
+             "преподавателя.\n\n"
+             "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!",
         parse_mode="Markdown")
 
-    # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
-    return GETNAME
+
+def about(update: Update, context: CallbackContext):
+    """
+    Информация о боте при использовании команды /about
+    """
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="*MIREA Teacher Schedule Bot*\n"
+             "*Разработан Mirea Ninja*\n\n"
+             "*Исходный код: https://github.com/mirea-ninja/mirea-teacher-schedule-bot*", parse_mode="Markdown")
 
 
 def got_name_handler(update: Update, context: CallbackContext) -> int:
@@ -83,48 +95,50 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
-    inputed_teacher = update.message.text
+    inputted_teacher = update.message.text
     lazy_logger.info(json.dumps(
-        {"type": "request", "query": inputed_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
+        {"type": "request", "query": inputted_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
     )
     )
-    if len(inputed_teacher) < 2:
+    if len(inputted_teacher) < 2:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Слишком короткий запрос\nПопробуйте еще раз")
         return GETNAME
-    teacher = normalize_teachername(inputed_teacher)
+    teacher = normalize_teachername(inputted_teacher)
 
     # Устанавливаем расписание преподавателей в контексте для избежания повторных запросов
     teacher_schedule = fetch_schedule_by_name(teacher)
+    if teacher_schedule:
 
-    if teacher_schedule is None:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Ошибка при поиске\n\nУбедитесь, что вы ввели фамилию преподавателя в формате:\n*Фамилия* или "
-                 "*Фамилия И.О.* поддерживаются только инициалы!\n\n"
-                 "Если преподаватель присутствует в расписании, попробуйте ещё раз позднее", parse_mode="Markdown")
-        return GETNAME
+        context.user_data["schedule"] = teacher_schedule
+        available_teachers = check_same_surnames(teacher_schedule, teacher)
 
-    context.user_data["schedule"] = teacher_schedule
-    available_teachers = check_same_surnames(teacher_schedule, teacher)
+        if len(available_teachers) > 1:
+            context.user_data["available_teachers"] = available_teachers
+            return send_teacher_clarity(update, context, True)
 
-    if len(available_teachers) > 1:
-        context.user_data["available_teachers"] = available_teachers
-        return send_teacher_clarity(update, context, True)
+        elif len(available_teachers) == 0:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Ошибка при определении ФИО преподавателя. Повторите попытку, изменив запрос.\n" +
+                     "Например введите только фамилию преподавателя.\n\n"
+                     "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!", parse_mode="Markdown"
+            )
+            return GETNAME
 
-    elif len(available_teachers) == 0:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Ошибка при определении ФИО преподавателя. Повторите попытку, изменив запрос.\n" +
-                 "Например введите только фамилию преподавателя."
-        )
-        return GETNAME
+        else:
+            context.user_data["available_teachers"] = None
+            context.user_data['teacher'] = available_teachers[0]
+            return send_week_selector(update, context, True)
 
     else:
-        context.user_data["available_teachers"] = None
-        context.user_data['teacher'] = available_teachers[0]
-        return send_week_selector(update, context, True)
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Преподаватель не найден\nПопробуйте еще раз\n\nУбедитесь, что преподаватель указан в формате "
+                 "*Иванов* или *Иванов И.И.*\n\n"
+                 "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!", parse_mode="Markdown")
+        return GETNAME
 
 
 def got_teacher_clarification_handler(update: Update, context: CallbackContext):
@@ -152,7 +166,7 @@ def got_week_handler(update: Update, context: CallbackContext) -> Any | None:
     """
     selected_button = update.callback_query.data
     if selected_button == "back":
-        if context.user_data['available_teachers'] != None:
+        if context.user_data['available_teachers'] is not None:
             return send_teacher_clarity(update, context)
         else:
             return resend_name_input(update, context)
@@ -224,7 +238,7 @@ def fetch_schedule_by_name(teacher_name):
     @param teacher_name: Имя преподавателя
     @return: JSON расписание или None если преподаватель не найден
     """
-    url = f"https://schedule.mirea.ninja/api/schedule/teacher/{teacher_name}"
+    url = f"https://timetable.mirea.ru/api/teacher/search/{teacher_name}"
     response = requests.get(url)
     return response.json() if response.status_code == 200 else None
 
@@ -321,14 +335,14 @@ def send_result(update: Update, context: CallbackContext):
     schedule_data = context.user_data["schedule"]
     teacher_surname = context.user_data["teacher"]
 
-    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname)
+    parsed_schedule = parse(schedule_data, weekday, week, teacher_surname, context)
     parsed_schedule = remove_duplicates_merge_groups_with_same_lesson(parsed_schedule)
     parsed_schedule = merge_weeks_numbers(parsed_schedule)
     if len(parsed_schedule) == 0:
         update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
         return GETWEEK
     # Отправляем расписание преподавателя
-    blocks_of_text = format_outputs(parsed_schedule)
+    blocks_of_text = format_outputs(parsed_schedule, context)
 
     return telegram_delivery_optimisation(blocks_of_text, update, context)
 
@@ -342,14 +356,12 @@ def check_same_surnames(teacher_schedule, surname):
     :return: surnames - лист ФИО преподавателей
     """
     surnames = []
-    schedules = teacher_schedule["schedules"]
-    for schedule in schedules:
-        teachers = schedule["lesson"]["teachers"]
-        for teacher in teachers:
-            truncated = str(teacher).replace(" ", '')
-            truncated_surname = surname.replace(' ', '')
-            if truncated not in str(surnames).replace(' ', '') and truncated_surname in truncated:
-                surnames.append(teacher)
+    for teacher in teacher_schedule:
+        if surname in teacher['name']:
+            if teacher['name'][-1] != ".":
+                teacher['name'] += "."
+            surnames.append(teacher['name'])
+            surnames = list(set(surnames))
     return surnames
 
 
@@ -363,11 +375,9 @@ def construct_teacher_workdays(teacher: str, week: int, schedule: list):
     @param schedule: Расписание в JSON
     @return: InlineKeyboard со стилизованными кнопками
     """
-    founded_days = []
-    for lesson in schedule['schedules']:
-        if week in lesson['lesson']['weeks']:
-            if lesson['weekday'] not in founded_days:
-                founded_days.append(lesson['weekday'])
+
+    founded_days = list(
+        {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons'] if week in lesson['weeks']})
 
     no_work_indicator = "🏖️"
     weekdays = {
@@ -411,27 +421,30 @@ def decode_teachers(rawNames):
     response = requests.get("https://cms.mirea.ninja/api/get-full-teacher-name", headers=headers, params=params)
     if response.status_code == 200:
         data = response.json()
+        if data:
+            decoded_names = {}
+            for names in data:
+                if len(names["possibleFullNames"]) == 1:
+                    decomposed_name = names["possibleFullNames"][0]
+                    name = []
+                    if surname := decomposed_name.get("lastName"):
+                        name.append(surname)
+                    if first_name := decomposed_name.get("firstName"):
+                        name.append(first_name)
+                    if middle_name := decomposed_name.get("middleName"):
+                        name.append(middle_name)
+                    name = " ".join(name)
+                    raw_name = names["rawName"]
+                    decoded_names[raw_name] = name
 
-        decoded_names = []
-        for names in data:
-            if len(names["possibleFullNames"]) == 1:
-                decomposed_name = names["possibleFullNames"][0]
-                name = []
-                if surname := decomposed_name.get("lastName"):
-                    name.append(surname)
-                if first_name := decomposed_name.get("firstName"):
-                    name.append(first_name)
-                if middle_name := decomposed_name.get("middleName"):
-                    name.append(middle_name)
-                name = " ".join(name)
-            else:
-                name = names["rawName"]
-            decoded_names.append(name)
+            # Create a list of decoded names in the same order as raw names
+            decoded_list = [decoded_names[raw_name] if raw_name in decoded_names else raw_name for raw_name in rawNames]
 
-        decoded_names = decoded_names
+        else:
+            decoded_list = rawNames
     else:
-        decoded_names = rawNames
-    return decoded_names
+        decoded_list = rawNames
+    return decoded_list
 
 
 def prepare_teacher_markup(teachers):
@@ -484,17 +497,18 @@ def construct_weeks_markup():
     return reply_mark
 
 
-def parse(teacher_schedule, weekday, week_number, teacher):
-    teacher_schedule = teacher_schedule["schedules"]
-    teacher_schedule = list(filter(lambda x: teacher in str(x["lesson"]["teachers"]), teacher_schedule))
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["group"])
-    if (weekday != -1):
-        teacher_schedule = list(filter(lambda x: x["weekday"] == int(weekday), teacher_schedule))
-    teacher_schedule = list(filter(lambda x: int(week_number) in x["lesson"]["weeks"], teacher_schedule))
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_start"])
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["lesson"]["time_end"])
-    teacher_schedule = sorted(teacher_schedule, key=lambda x: x["weekday"])
-    return teacher_schedule
+def parse(teacher_schedule, weekday, week_number, teacher, context):
+    context.user_data["teacher"] = teacher
+    for lesson in teacher_schedule:
+        teacher_schedule = lesson["lessons"]
+        teacher_schedule = sorted(teacher_schedule,
+                                  key=lambda lesson: (
+                                      lesson['weekday'], lesson['calls']['num'], lesson['group']['name']),
+                                  reverse=False)
+        if (weekday != -1):
+            teacher_schedule = list(filter(lambda lesson: lesson['weekday'] == int(weekday), teacher_schedule))
+        teacher_schedule = list(filter(lambda x: int(week_number) in x['weeks'], teacher_schedule))
+        return teacher_schedule
 
 
 def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
@@ -502,14 +516,12 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
     for i in range(len(teacher_schedule)):
         for j in range(i + 1, len(teacher_schedule)):
             if (
-                    teacher_schedule[i]["weekday"] == teacher_schedule[j]["weekday"]
-                    and teacher_schedule[i]["lesson"]["name"] == teacher_schedule[j]["lesson"]["name"]
-                    and teacher_schedule[i]["lesson"]["weeks"] == teacher_schedule[j]["lesson"]["weeks"]
-                    and teacher_schedule[i]["lesson"]["time_start"] == teacher_schedule[j]["lesson"]["time_start"]
+                    teacher_schedule[i]['calls']['num'] == teacher_schedule[j]['calls']['num'] and
+                    teacher_schedule[i]['weeks'] == teacher_schedule[j]['weeks'] and
+                    teacher_schedule[i]['weekday'] == teacher_schedule[j]['weekday']
             ):
-                teacher_schedule[i]["group"] += ", " + teacher_schedule[j]["group"]
+                teacher_schedule[i]["group"]["name"] += ", " + teacher_schedule[j]["group"]["name"]
                 remove_index.append(j)
-
     remove_index = set(remove_index)
     for i in sorted(remove_index, reverse=True):
         del teacher_schedule[i]
@@ -518,20 +530,19 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
 
 def merge_weeks_numbers(teacher_schedule):
     for i in range(len(teacher_schedule)):
-        weeks = teacher_schedule[i]["lesson"]["weeks"]
-        if weeks == list(range(1, 18)):
-            weeks = "все"
-        elif weeks == list(range(2, 18, 2)):
-            weeks = "по чётным"
-        elif weeks == list(range(1, 18, 2)):
-            weeks = "по нечётным"
+        if teacher_schedule[i]['weeks'] == list(range(1, 18)):
+            teacher_schedule[i]['weeks'] = "все"
+        elif teacher_schedule[i]['weeks'] == list(range(2, 19, 2)):
+            teacher_schedule[i]['weeks'] = "по чётным"
+        elif teacher_schedule[i]['weeks'] == list(range(1, 18, 2)):
+            teacher_schedule[i]['weeks'] = "по нечётным"
         else:
-            weeks = ", ".join(str(week) for week in weeks)
-        teacher_schedule[i]["lesson"]["weeks"] = weeks
+            teacher_schedule[i]['weeks'] = ", ".join(str(week) for week in teacher_schedule[i]['weeks'])
     return teacher_schedule
 
 
-def format_outputs(schedules):
+def format_outputs(parsed_schedule, context):
+    from datetime import datetime
     text = ""
     WEEKDAYS = {
         1: "Понедельник",
@@ -542,22 +553,53 @@ def format_outputs(schedules):
         6: "Суббота",
     }
     blocks = []
-    for schedule in schedules:
-        room = ", ".join(schedule["lesson"]["rooms"])
-        teachers = schedule["lesson"]["teachers"]
-        weekday = WEEKDAYS[schedule["weekday"]]
-        teachers = ", ".join(decode_teachers(teachers))
+    for schedule in parsed_schedule:
+        error_message = None
+        try:
+            room = schedule["room"]["name"] if schedule["room"] is not None else ""
+            campus = schedule["room"]["campus"]["short_name"] if schedule["room"] and \
+                                                                 schedule["room"]["campus"] else ""
+            if campus != "":
+                room = f"{room} ({campus})"
+            else:
+                room = f"{room}"
 
-        text += f'📝 Пара № {schedule["lesson_number"] + 1} в ⏰ {schedule["lesson"]["time_start"]} – {schedule["lesson"]["time_end"]}\n'
-        text += f'📝 {schedule["lesson"]["name"]}\n'
-        text += f'👥 Группы: {schedule["group"]}\n'
-        text += f'📚 Тип: {schedule["lesson"]["types"]}\n'
-        text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
-        text += f"🏫 Аудитории: {room}\n"
-        text += f'📅 Недели: {schedule["lesson"]["weeks"]}\n'
-        text += f"📆 День недели: {weekday}\n\n"
-        blocks.append(text)
-        text = ""
+            weekday = WEEKDAYS[schedule["weekday"]]
+            teachers = ", ".join(decode_teachers([context.user_data["teacher"]]))
+
+            time_start = datetime.strptime(schedule['calls']['time_start'], "%H:%M:%S").strftime("%H:%M")
+            time_end = datetime.strptime(schedule['calls']['time_end'], "%H:%M:%S").strftime("%H:%M")
+
+            formatted_time = f"{time_start} – {time_end}"
+            type = schedule["lesson_type"]["name"] if schedule["lesson_type"] else ""
+            text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
+            text += f'📝 {schedule["discipline"]["name"]}\n'
+            text += f'👥 Группы: {schedule["group"]["name"]}\n'
+            text += f'📚 Тип: {type}\n'
+            text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
+            text += f"🏫 Аудитории: {room}\n"
+            text += f'📅 Недели: {schedule["weeks"]}\n'
+            text += f"📆 День недели: {weekday}\n\n"
+            blocks.append(text)
+            text = ""
+        except Exception as e:
+            if str(e) == error_message:
+                lazy_logger.error(json.dumps(
+                    {"type": "error",
+                     "teacher": context.user_data['teacher'],
+                     "week": context.user_data['week'],
+                     }, ensure_ascii=False))
+            else:
+                error_message = str(e)
+                lazy_logger.error(json.dumps(
+                    {"type": "error",
+                     "teacher": context.user_data['teacher'],
+                     "week": context.user_data['week'],
+                     }, ensure_ascii=False))
+                text += "Ошибка при получении расписания, сообщите об этом администрации в чате " \
+                        "https://t.me/mirea_ninja_chat"
+                blocks.append(text)
+                text = ""
 
     return blocks
 
@@ -706,18 +748,15 @@ def deny_inline_usage(update: Update):
 def main():
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("start", start, run_async=True),
             MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
         states={
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True)],
             GETDAY: [CallbackQueryHandler(got_day_handler, run_async=True)],
             GETWEEK: [CallbackQueryHandler(got_week_handler, run_async=True)],
-            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)],
-            # BACK: [CallbackQueryHandler(got_back_handler, run_async=True)],
+            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)]
         },
         fallbacks=[
-            CommandHandler("start", start, run_async=True),
             MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
     )
@@ -728,7 +767,10 @@ def main():
     dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
 
+    dispatcher.add_handler(CommandHandler("start", start, run_async=True))
     dispatcher.add_handler(CommandHandler("help", start, run_async=True))
+    dispatcher.add_handler(CommandHandler("about", about, run_async=True))
+
     updater.start_polling()
 
 
