@@ -60,7 +60,7 @@ GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
 
 
 # Handlers
-def start(update: Update, context: CallbackContext) -> int:
+def start(update: Update, context: CallbackContext):
     """
     Привествие бота при использовании команды /start
     """
@@ -76,8 +76,16 @@ def start(update: Update, context: CallbackContext) -> int:
              "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!",
         parse_mode="Markdown")
 
-    # Переключаемся в состояние GETNAME (ожидание ввода фамилии)
-    return GETNAME
+
+def about(update: Update, context: CallbackContext):
+    """
+    Информация о боте при использовании команды /about
+    """
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="*MIREA Teacher Schedule Bot*\n"
+             "*Разработан Mirea Ninja*\n\n"
+             "*Исходный код: https://github.com/mirea-ninja/mirea-teacher-schedule-bot*", parse_mode="Markdown")
 
 
 def got_name_handler(update: Update, context: CallbackContext) -> int:
@@ -740,18 +748,15 @@ def deny_inline_usage(update: Update):
 def main():
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("start", start, run_async=True),
             MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
         states={
             GETNAME: [MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True)],
             GETDAY: [CallbackQueryHandler(got_day_handler, run_async=True)],
             GETWEEK: [CallbackQueryHandler(got_week_handler, run_async=True)],
-            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)],
-            # BACK: [CallbackQueryHandler(got_back_handler, run_async=True)],
+            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)]
         },
         fallbacks=[
-            CommandHandler("start", start, run_async=True),
             MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
     )
@@ -762,7 +767,10 @@ def main():
     dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
 
+    dispatcher.add_handler(CommandHandler("start", start, run_async=True))
     dispatcher.add_handler(CommandHandler("help", start, run_async=True))
+    dispatcher.add_handler(CommandHandler("about", about, run_async=True))
+
     updater.start_polling()
 
 
