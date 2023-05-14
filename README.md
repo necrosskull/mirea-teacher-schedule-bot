@@ -1,12 +1,15 @@
 # Телеграм бот с расписанием преподователей РТУ МИРЭА
- [![BOT - LINK](https://img.shields.io/static/v1?label=BOT&message=LINK&color=229ed9&style=for-the-badge)](https://t.me/teacherschedulertu_bot)
+
+[![BOT - LINK](https://img.shields.io/static/v1?label=BOT&message=LINK&color=229ed9&style=for-the-badge)](https://t.me/teacherschedulertu_bot)
 
 ## О проекте
+
 Проект представляет собой бота для телеграма, который позволяет получать расписание `преподавателей РТУ МИРЭА.`
 
 Проект написан на языке `Python` с использованием библиотеки `python-telegram-bot 13.15.`
 
-Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-timetable), который предоставляет расписание в формате `JSON.`
+Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-timetable), который предоставляет
+расписание в формате `JSON.`
 
 Бот находится в стадии активной разработки, поэтому возможны ошибки и недоработки.
 ***
@@ -16,23 +19,23 @@
 ### Локальный запуск
 
 1. Установите все необходимые зависимости, используя Poetry:
+
 ```bash
 poetry install
 ```
+
 2. Добавьте файл `.env` в корневую директорию проекта и заполните его по примеру `.env.example`
 3. Запустите приложение:
+
 ```bash
 poetry run python bot/main.py
 ```
 
 ### Запуск с использованием Docker
 
-Чтобы запустить это приложение с помощью docker, для начала вам необходимо собрать локальный образ контейнера:
+Для начала добавьте файл `.env` в корневую директорию проекта и заполните его по примеру `.env.example`, затем выполните
+команду:
 
 ```bash
-docker build -t schedule_bot .
-``` 
-
-```bash
-docker run --name schedule_bot --env-file .env schedule_bot
+docker-compose up -d
 ```
