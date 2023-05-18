@@ -149,11 +149,14 @@ def got_teacher_clarification_handler(update: Update, context: CallbackContext):
     @return: Int код шага
     """
     chosed_teacher = update.callback_query.data
+    if chosed_teacher == "back":
+        return resend_name_input(update, context)
+    if chosed_teacher not in context.user_data['available_teachers']:
+        update.callback_query.answer(text="Ошибка, сделайте новый запрос", show_alert=True)
+        return GETNAME
     context.user_data['teacher'] = chosed_teacher
     clarified_schedule = fetch_schedule_by_name(chosed_teacher)
     context.user_data['schedule'] = clarified_schedule
-    if chosed_teacher == "back":
-        return resend_name_input(update, context)
     return send_week_selector(update, context)
 
 
@@ -187,10 +190,13 @@ def got_week_handler(update: Update, context: CallbackContext) -> Any | None:
         context.user_data["day"] = today
         return send_result(update, context)
 
-    else:
+    if selected_button.isdigit():
         selected_week = int(selected_button)
         context.user_data["week"] = selected_week
         return send_day_selector(update, context)
+    else:
+        update.callback_query.answer(text="Ошибка, ожидается неделя", show_alert=False)
+        return GETWEEK
 
 
 def got_day_handler(update: Update, context: CallbackContext):
@@ -207,10 +213,18 @@ def got_day_handler(update: Update, context: CallbackContext):
         return GETDAY
     if selected_button == "back":
         return send_week_selector(update, context)
-    selected_day = -1
-    if selected_button != "week":
+
+    if selected_button == "week":
+        selected_day = -1
+        context.user_data["day"] = selected_day
+
+    elif selected_button.isdigit():
         selected_day = int(selected_button)
-    context.user_data["day"] = selected_day
+        context.user_data["day"] = selected_day
+
+    else:
+        update.callback_query.answer(text="Ошибка, ожидается день недели", show_alert=False)
+        return GETDAY
     try:
         return send_result(update, context)
     except Exception as e:
