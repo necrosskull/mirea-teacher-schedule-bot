@@ -130,6 +130,7 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
         else:
             context.user_data["available_teachers"] = None
             context.user_data['teacher'] = available_teachers[0]
+            context.user_data["schedule"] = fetch_schedule_by_name(available_teachers[0])
             return send_week_selector(update, context, True)
 
     else:
