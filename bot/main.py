@@ -71,7 +71,7 @@ def start(update: Update, context: CallbackContext):
              "его фамилию "
              "в формате:\n*Иванов* или *Иванов И.И.*\n\n"
              "Также вы можете использовать inline-режим, "
-             "для этого в любом чате наберите *@teacherschedulertu_bot* + *фамилию* и нажмите на кнопку с фамилией "
+             "для этого в любом чате наберите *@mirea_teachers_bot* + *фамилию* и нажмите на кнопку с фамилией "
              "преподавателя.\n\n"
              "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!",
         parse_mode="Markdown")
@@ -238,9 +238,13 @@ def fetch_schedule_by_name(teacher_name):
     @param teacher_name: Имя преподавателя
     @return: JSON расписание или None если преподаватель не найден
     """
+
     url = f"https://timetable.mirea.ru/api/teacher/search/{teacher_name}"
-    response = requests.get(url)
-    return response.json() if response.status_code == 200 else None
+    try:
+        response = requests.get(url)
+        return response.json() if response.status_code == 200 else None
+    except requests.RequestException:
+        return None
 
 
 def send_week_selector(update: Update, context: CallbackContext, firsttime=False):
