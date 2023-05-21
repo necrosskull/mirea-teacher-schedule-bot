@@ -25,4 +25,4 @@ COPY . .
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
 # Run the application
-CMD ["python", "./bot/main.py"]
+CMD ["python", "./bot/start.py"]
