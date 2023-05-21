@@ -95,6 +95,9 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
+    if update.message.via_bot:
+        return GETNAME
+
     inputted_teacher = update.message.text
     lazy_logger.info(json.dumps(
         {"type": "request", "query": inputted_teacher.lower(), **update.message.from_user.to_dict()}, ensure_ascii=False
