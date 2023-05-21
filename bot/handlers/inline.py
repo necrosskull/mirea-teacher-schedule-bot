@@ -4,11 +4,11 @@ from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import CallbackContext, InlineQueryHandler, ChosenInlineResultHandler, CallbackQueryHandler
 
 from bot.InlineStep import EInlineStep
-from bot.construct import construct_weeks_markup
-from bot.decode import decode_teachers
-from bot.handlers import fetch_schedule_by_name, got_week_handler, got_day_handler, GETDAY, BACK, GETWEEK
+from bot.handlers.construct import construct_weeks_markup
+from bot.formats.decode import decode_teachers
+from bot.handlers.handlers import fetch_schedule_by_name, got_week_handler, got_day_handler, GETDAY, BACK, GETWEEK
 from bot.lazy_logger import lazy_logger
-from bot.parse import check_same_surnames
+from bot.formats.parse import check_same_surnames
 
 
 def inlinequery(update: Update, context: CallbackContext):

@@ -12,11 +12,12 @@ from telegram.ext import (
     MessageHandler
 )
 
-from construct import construct_teacher_markup, construct_weeks_markup, construct_teacher_workdays
-from decode import decode_teachers
-from formatting import normalize_teachername, format_outputs
-from lazy_logger import lazy_logger
-from parse import check_same_surnames, merge_weeks_numbers, remove_duplicates_merge_groups_with_same_lesson, parse
+from bot.handlers.construct import construct_teacher_markup, construct_weeks_markup, construct_teacher_workdays
+from bot.formats.decode import decode_teachers
+from bot.formats.formatting import normalize_teachername, format_outputs
+from bot.lazy_logger import lazy_logger
+from bot.formats.parse import check_same_surnames, merge_weeks_numbers, remove_duplicates_merge_groups_with_same_lesson, \
+    parse
 
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
 
@@ -146,9 +147,9 @@ def got_week_handler(update: Update, context: CallbackContext) -> Any | None:
                 week += 1  # Корректировка недели, в случае если происходит переход недели
 
             today = (
-                datetime.date.today() +
-                datetime.timedelta(
-                    days=1)).weekday()
+                    datetime.date.today() +
+                    datetime.timedelta(
+                        days=1)).weekday()
 
         if today == 6:
             update.callback_query.answer("В выбранный день пар нет")

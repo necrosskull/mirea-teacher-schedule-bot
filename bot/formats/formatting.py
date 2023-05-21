@@ -1,5 +1,5 @@
-from decode import decode_teachers
-from lazy_logger import lazy_logger
+from bot.lazy_logger import lazy_logger
+from bot.formats.decode import decode_teachers
 import json
 
 

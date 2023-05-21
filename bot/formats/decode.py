@@ -1,5 +1,6 @@
 import requests
-from config import cmstoken
+
+from bot.config import cmstoken
 
 
 def decode_teachers(rawNames):

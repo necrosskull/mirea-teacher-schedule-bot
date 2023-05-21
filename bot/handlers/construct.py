@@ -3,7 +3,7 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import ImportantDays
 import datetime as datetime
 
-from decode import decode_teachers
+from bot.formats.decode import decode_teachers
 
 
 def construct_teacher_workdays(teacher: str, week: int, schedule: list):
