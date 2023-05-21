@@ -21,5 +21,8 @@ RUN poetry install --no-dev --no-root --no-interaction --no-ansi
 # Copy the rest of the project
 COPY . .
 
+# Set the PYTHONPATH
+ENV PYTHONPATH "${PYTHONPATH}:/app"
+
 # Run the application
 CMD ["python", "./bot/main.py"]
