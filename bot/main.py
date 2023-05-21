@@ -95,7 +95,12 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
-    if update.message.via_bot:
+
+    try:
+        if update.message.via_bot:
+            return GETNAME
+
+    except AttributeError:
         return GETNAME
 
     inputted_teacher = update.message.text
