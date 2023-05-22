@@ -1,4 +1,4 @@
-from bot import config
+import bot.config as config
 import logging
 from telegram.ext import Updater
 

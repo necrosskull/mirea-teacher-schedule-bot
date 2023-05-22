@@ -1,7 +1,7 @@
 import logging_loki
 import logging
 
-from config import grafana_token
+import bot.config as config
 
 
 class LazyLogger:
@@ -26,7 +26,7 @@ class LazyLogger:
 
     def __getattr__(self, attr):
         if not self.logger:
-            self.init_logger(grafana_token)
+            self.init_logger(config.grafana_token)
         return getattr(self.logger, attr)
 
 

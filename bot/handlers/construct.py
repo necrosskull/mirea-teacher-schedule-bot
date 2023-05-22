@@ -1,9 +1,9 @@
 import requests
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from bot import ImportantDays
+import bot.ImportantDays as ImportantDays
 import datetime as datetime
 
-from bot.formats.decode import decode_teachers
+import bot.formats.decode as decode
 
 
 def construct_teacher_workdays(teacher: str, week: int, schedule: list):
@@ -66,7 +66,7 @@ def construct_teacher_markup(teachers):
     :param teachers: лист преподавателей
     """
     rawNames = teachers
-    decoded_names = decode_teachers(rawNames)
+    decoded_names = decode.decode_teachers(rawNames)
 
     btns = []
 

@@ -1,4 +1,4 @@
-from telegram import Update, parsemode
+from telegram import Update
 from telegram.ext import CallbackContext, CommandHandler
 
 
@@ -26,8 +26,8 @@ def about(update: Update, context: CallbackContext):
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="*MIREA Teacher Schedule Bot*\n"
-        "*Разработан Mirea Ninja*\n\n"
-        "*Исходный код: https://github.com/mirea-ninja/mirea-teacher-schedule-bot*",
+             "*Разработан Mirea Ninja*\n\n"
+             "*Исходный код: https://github.com/mirea-ninja/mirea-teacher-schedule-bot*",
         parse_mode="Markdown")
 
 
