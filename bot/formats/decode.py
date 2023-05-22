@@ -1,6 +1,6 @@
 import requests
 
-from bot.config import cmstoken
+import bot.config as config
 
 
 def decode_teachers(rawNames):
@@ -9,7 +9,7 @@ def decode_teachers(rawNames):
     :param rawNames: список необработанных ФИО
     """
     headers = {
-        "Authorization": f"Bearer {cmstoken}"}
+        "Authorization": f"Bearer {config.cmstoken}"}
     params = {"rawNames": ",".join(rawNames)}
 
     response = requests.get(

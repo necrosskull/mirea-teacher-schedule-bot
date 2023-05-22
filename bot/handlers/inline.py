@@ -3,12 +3,15 @@ import json
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import CallbackContext, InlineQueryHandler, ChosenInlineResultHandler, CallbackQueryHandler
 
-from bot.InlineStep import EInlineStep
-from bot.handlers.construct import construct_weeks_markup
-from bot.formats.decode import decode_teachers
-from bot.handlers.handlers import fetch_schedule_by_name, got_week_handler, got_day_handler, GETDAY, BACK, GETWEEK
-from bot.lazy_logger import lazy_logger
-from bot.formats.parse import check_same_surnames
+import bot.InlineStep as InlineStep
+import bot.handlers.construct as construct
+import bot.formats.decode as decode
+import bot.handlers.handlers as handlers
+import bot.lazy_logger as logger
+import bot.formats.formatting as formatting
+import bot.handlers.fetch as fetch
+
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
 
 
 def inlinequery(update: Update, context: CallbackContext):
@@ -24,7 +27,7 @@ def inlinequery(update: Update, context: CallbackContext):
     if len(query) < 3:
         return
 
-    lazy_logger.info(json.dumps(
+    logger.lazy_logger.info(json.dumps(
         {"type": "query",
          "queryId": update.inline_query.id,
          "query": query.lower(),
@@ -35,19 +38,19 @@ def inlinequery(update: Update, context: CallbackContext):
     if " " not in query:
         query += " "
 
-    teacher_schedule = fetch_schedule_by_name(query)
+    teacher_schedule = fetch.fetch_schedule_by_name(query)
 
     if teacher_schedule is None:
         return
 
-    surnames = check_same_surnames(teacher_schedule, query)
+    surnames = formatting.check_same_surnames(teacher_schedule, query)
 
     if len(surnames) == 0:
         return
 
     inline_results = []
 
-    decoded_surnames = decode_teachers(surnames)
+    decoded_surnames = decode.decode_teachers(surnames)
     userid = str(update.inline_query.from_user.id)
 
     for surname, decoded_surname in zip(surnames, decoded_surnames):
@@ -58,7 +61,7 @@ def inlinequery(update: Update, context: CallbackContext):
             input_message_content=InputTextMessageContent(
                 message_text=f"Выбран преподаватель: {decoded_surname}!"
             ),
-            reply_markup=construct_weeks_markup(),
+            reply_markup=construct.construct_weeks_markup(),
 
         ))
 
@@ -72,7 +75,7 @@ def answer_inline_handler(update: Update, context: CallbackContext):
     """
     if update.chosen_inline_result is not None:
         context.user_data["teacher"] = update.chosen_inline_result.result_id
-        context.user_data["inline_step"] = EInlineStep.ask_week
+        context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
         context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
         return
 
@@ -94,32 +97,32 @@ def inline_dispatcher(update: Update, context: CallbackContext):
         return
 
     status = context.user_data["inline_step"]
-    if status == EInlineStep.completed or status == EInlineStep.ask_teacher:
+    if status == InlineStep.EInlineStep.completed or status == InlineStep.EInlineStep.ask_teacher:
         deny_inline_usage(update)
         return
 
-    if status == EInlineStep.ask_week:
+    if status == InlineStep.EInlineStep.ask_week:
         context.user_data['available_teachers'] = None
-        context.user_data["schedule"] = fetch_schedule_by_name(
+        context.user_data["schedule"] = fetch.fetch_schedule_by_name(
             context.user_data["teacher"])
 
-        target = got_week_handler(update, context)
+        target = handlers.got_week_handler(update, context)
 
         if target == GETDAY:
-            context.user_data["inline_step"] = EInlineStep.ask_day
+            context.user_data["inline_step"] = InlineStep.EInlineStep.ask_day
 
         elif target == BACK:
-            context.user_data["inline_step"] = EInlineStep.ask_day
+            context.user_data["inline_step"] = InlineStep.EInlineStep.ask_day
 
-    if status == EInlineStep.ask_day:
-        target = got_day_handler(update, context)
+    if status == InlineStep.EInlineStep.ask_day:
+        target = handlers.got_day_handler(update, context)
         if target == GETWEEK:
-            context.user_data["schedule"] = fetch_schedule_by_name(
+            context.user_data["schedule"] = fetch.fetch_schedule_by_name(
                 context.user_data["teacher"])
-            context.user_data["inline_step"] = EInlineStep.ask_week
+            context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
 
         elif target == BACK:
-            context.user_data["inline_step"] = EInlineStep.ask_day
+            context.user_data["inline_step"] = InlineStep.EInlineStep.ask_day
         return
 
 
