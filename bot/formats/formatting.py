@@ -75,8 +75,8 @@ def format_outputs(parsed_schedule, context):
                      "teacher": context.user_data['teacher'],
                      "week": context.user_data['week'],
                      }, ensure_ascii=False))
-                text += "Ошибка при получении расписания, сообщите об этом администрации в чате " \
-                        "https://t.me/mirea_ninja_chat"
+                text += "Ошибка при получении расписания, сообщите об этом в техподдержку " \
+                        "@mirea_help_bot"
                 blocks.append(text)
                 text = ""
 
