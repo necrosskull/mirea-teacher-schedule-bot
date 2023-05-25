@@ -28,7 +28,7 @@ poetry install
 3. Запустите приложение:
 
 ```bash
-poetry run python bot/main.py
+poetry run python -m bot
 ```
 
 ### Запуск с использованием Docker
