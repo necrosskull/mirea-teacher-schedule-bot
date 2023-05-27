@@ -171,3 +171,4 @@ exams.json
 rassilka.py
 test2.py
 bot/cmstest.py
+bot/handlers/roomtester.py

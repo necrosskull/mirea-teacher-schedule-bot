@@ -6,19 +6,23 @@ import datetime as datetime
 import bot.formats.decode as decode
 
 
-def construct_teacher_workdays(teacher: str, week: int, schedule: list):
+def construct_teacher_workdays(week: int, schedule: list, room):
     """
     Создает Inline клавиатуру с днями недели, когда у преподавателя есть пары.
     В случае если у преподавателя есть пары, то колбэк кнопки равен дню недели
     В случае если пар нет, то колбэк кнопки равен 'chill'
-    @param teacher: Имя преподавателя
     @param week: Номер недели
     @param schedule: Расписание в JSON
+    @param room: Название аудитории
     @return: InlineKeyboard со стилизованными кнопками
     """
 
-    founded_days = list(
-        {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons'] if week in lesson['weeks']})
+    if room:
+        founded_days = list(
+            {lesson['weekday'] for lesson in schedule if lesson['room']['name'] == room and week in lesson['weeks']})
+    else:
+        founded_days = list(
+            {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons'] if week in lesson['weeks']})
 
     no_work_indicator = "🏖️"
     weekdays = {
@@ -77,6 +81,23 @@ def construct_teacher_markup(teachers):
     TEACHER_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
 
     return TEACHER_CLARIFY_MARKUP
+
+
+def construct_rooms_markup(rooms):
+    """
+    Конструирует клавиатуру доступных аудиторий
+    :param rooms: лист аудиторий
+    """
+    btns = []
+
+    for room in rooms:
+        room_number, room_data = room.split(':')
+        btns = btns + \
+               [[InlineKeyboardButton(room_number, callback_data=room_data)]]
+    btns = btns + [[(InlineKeyboardButton("Назад", callback_data="back"))]]
+    ROOM_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
+
+    return ROOM_CLARIFY_MARKUP
 
 
 def construct_weeks_markup():
