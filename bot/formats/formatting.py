@@ -244,7 +244,7 @@ def merge_weeks_numbers(teacher_schedule):
 def check_same_rooms(room_schedule, room):
     classes = []
     for rooms in room_schedule:
-        if room in rooms['name']:
+        if room in rooms['name'].lower():
             class_info = f"{rooms['name']}:{rooms['id']}"
             classes.append(class_info)
 
