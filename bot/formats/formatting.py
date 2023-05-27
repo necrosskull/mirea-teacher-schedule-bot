@@ -32,8 +32,15 @@ def format_outputs(parsed_schedule, context):
                 room = f"{room}"
 
             weekday = WEEKDAYS[schedule["weekday"]]
-            teachers = ", ".join(decode.decode_teachers(
-                [context.user_data["teacher"]]))
+
+            if context.user_data["state"] == "get_room":
+                groups = ""
+                for teacher in schedule["teachers"]:
+                    teachers = ", ".join(decode.decode_teachers([teacher["name"]]))
+            else:
+                groups = schedule["group"]["name"]
+                teachers = ", ".join(decode.decode_teachers(
+                    [context.user_data["teacher"]]))
 
             time_start = datetime.strptime(
                 schedule['calls']['time_start'],
@@ -49,7 +56,8 @@ def format_outputs(parsed_schedule, context):
 
             text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
             text += f'📝 {schedule["discipline"]["name"]}\n'
-            text += f'👥 Группы: {schedule["group"]["name"]}\n'
+            if len(groups) > 0:
+                text += f'👥 Группы: {groups}\n'
             text += f'📚 Тип: {type}\n'
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
             text += f"🏫 Аудитории: {room}\n"
@@ -119,35 +127,69 @@ def check_same_surnames(teacher_schedule, surname):
     return surnames
 
 
-def parse(teacher_schedule, weekday, week_number, teacher, context):
-    context.user_data["teacher"] = teacher
+def parse(teacher_schedule, weekday, week_number, teacher, context, room):
+    if room:
+        context.user_data["room"] = room
+        filtered_schedule = teacher_schedule
 
-    for lesson in teacher_schedule:
-        teacher_schedule = lesson["lessons"]
-
-        teacher_schedule = sorted(
-            teacher_schedule,
+        filtered_schedule = sorted(
+            filtered_schedule,
             key=lambda lesson: (
                 lesson['weekday'],
                 lesson['calls']['num'],
-                lesson['group']['name']),
-            reverse=False)
+                lesson['discipline']['name']
+            ),
+            reverse=False
+        )
 
-        if (weekday != -1):
-            teacher_schedule = list(
+        if weekday != -1:
+            filtered_schedule = list(
                 filter(
                     lambda lesson: lesson['weekday'] == int(weekday),
+                    filtered_schedule
+                )
+            )
+
+        filtered_schedule = list(
+            filter(
+                lambda lesson: int(week_number) in lesson['weeks'],
+                filtered_schedule
+            )
+        )
+
+        return filtered_schedule
+
+
+
+    else:
+        context.user_data["teacher"] = teacher
+
+        for lesson in teacher_schedule:
+            teacher_schedule = lesson["lessons"]
+
+            teacher_schedule = sorted(
+                teacher_schedule,
+                key=lambda lesson: (
+                    lesson['weekday'],
+                    lesson['calls']['num'],
+                    lesson['group']['name']),
+                reverse=False)
+
+            if (weekday != -1):
+                teacher_schedule = list(
+                    filter(
+                        lambda lesson: lesson['weekday'] == int(weekday),
+                        teacher_schedule))
+
+            teacher_schedule = list(
+                filter(
+                    lambda x: int(week_number) in x['weeks'],
                     teacher_schedule))
 
-        teacher_schedule = list(
-            filter(
-                lambda x: int(week_number) in x['weeks'],
-                teacher_schedule))
-
-        return teacher_schedule
+            return teacher_schedule
 
 
-def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
+def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule, context):
     remove_index = []
 
     for i in range(len(teacher_schedule)):
@@ -157,8 +199,9 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule):
                     teacher_schedule[i]['weeks'] == teacher_schedule[j]['weeks'] and
                     teacher_schedule[i]['weekday'] == teacher_schedule[j]['weekday']
             ):
-                teacher_schedule[i]["group"]["name"] += ", " + \
-                                                        teacher_schedule[j]["group"]["name"]
+                if context.user_data["state"] != "get_room":
+                    teacher_schedule[i]["group"]["name"] += ", " + \
+                                                            teacher_schedule[j]["group"]["name"]
 
                 remove_index.append(j)
 
@@ -186,3 +229,13 @@ def merge_weeks_numbers(teacher_schedule):
                 str(week) for week in teacher_schedule[i]['weeks'])
 
     return teacher_schedule
+
+
+def check_same_rooms(room_schedule, room):
+    classes = []
+    for rooms in room_schedule:
+        if room in rooms['name']:
+            class_info = f"{rooms['name']}:{rooms['id']}"
+            classes.append(class_info)
+
+    return classes

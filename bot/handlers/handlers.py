@@ -1,7 +1,7 @@
 import datetime
 import json
 from typing import Any
-
+import re
 import requests
 import bot.formats.formatting as formatting
 import bot.handlers.send as send
@@ -17,7 +17,7 @@ from telegram.ext import (
 
 import bot.lazy_logger as logger
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
 
 def got_name_handler(update: Update, context: CallbackContext) -> int:
@@ -27,13 +27,13 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
-
+    context.user_data["state"] = "get_name"
     try:
         if update.message.via_bot:
-            return GETNAME
+            return ConversationHandler.END
 
     except AttributeError:
-        return GETNAME
+        return ConversationHandler.END
 
     inputted_teacher = update.message.text
     logger.lazy_logger.info(json.dumps({"type": "request",
@@ -45,8 +45,6 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Слишком короткий запрос\nПопробуйте еще раз")
-
-        return GETNAME
 
     teacher = formatting.normalize_teachername(inputted_teacher)
 
@@ -68,8 +66,6 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
                      "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!",
                 parse_mode="Markdown")
 
-            return GETNAME
-
         else:
             context.user_data["available_teachers"] = None
             context.user_data['teacher'] = available_teachers[0]
@@ -85,8 +81,6 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
                  "*Иванов* или *Иванов И.И.*\n\n"
                  "Возникла проблема? Обратитесь в поддержу *@mirea_help_bot*!",
             parse_mode="Markdown")
-
-        return GETNAME
 
 
 def got_teacher_clarification_handler(
@@ -108,10 +102,39 @@ def got_teacher_clarification_handler(
             text="Ошибка, сделайте новый запрос",
             show_alert=True)
 
-        return GETNAME
-
     context.user_data['teacher'] = chosed_teacher
     clarified_schedule = fetch.fetch_schedule_by_name(chosed_teacher)
+    context.user_data['schedule'] = clarified_schedule
+
+    return send.send_week_selector(update, context)
+
+
+def got_room_clarification_handler(
+        update: Update,
+        context: CallbackContext):
+    """
+    Реакция бота на получение аудитории при состоянии ROOM_CLARIFY
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Int код шага
+    """
+    chosen_room = update.callback_query.data
+    context.user_data['room_id'] = chosen_room
+
+    for room in context.user_data['available_rooms']:
+        room_name, room_id = room.split(':')
+        if room_id == chosen_room:
+            context.user_data['room'] = room_name
+
+    if chosen_room == "back":
+        return send.resend_name_input(update, context)
+
+    if chosen_room != context.user_data['room_id']:
+        update.callback_query.answer(
+            text="Ошибка, сделайте новый запрос",
+            show_alert=True)
+
+    clarified_schedule = fetch.fetch_room_schedule_by_id(chosen_room)
     context.user_data['schedule'] = clarified_schedule
 
     return send.send_week_selector(update, context)
@@ -127,12 +150,19 @@ def got_week_handler(update: Update, context: CallbackContext) -> Any | None:
     selected_button = update.callback_query.data
 
     if selected_button == "back":
-        if context.user_data['available_teachers'] is not None:
-
-            return send.send_teacher_clarity(update, context)
-
+        if context.user_data['state'] == "get_room":
+            if context.user_data['available_rooms'] is not None:
+                return send.send_room_clarity(update, context)
+            else:
+                return send.resend_name_input(update, context)
         else:
-            return send.resend_name_input(update, context)
+
+            if context.user_data['available_teachers'] is not None:
+
+                return send.send_teacher_clarity(update, context)
+
+            else:
+                return send.resend_name_input(update, context)
 
     elif selected_button == "today" or selected_button == "tomorrow":
         today = datetime.date.today().weekday()
@@ -218,19 +248,63 @@ def got_day_handler(update: Update, context: CallbackContext):
     return GETDAY
 
 
+def got_room_handler(update: Update, context: CallbackContext):
+    """
+    Реакция бота на получение информации о выбранной аудитории в состоянии GETROOM
+    @param update: Update class of API
+    @param context: CallbackContext of API
+    @return: Int код шага
+    """
+    context.user_data["state"] = "get_room"
+    room = update.message.text[4:].title()
+
+    room_schedule = fetch.fetch_room_id_by_name(room)
+
+    if room_schedule:
+        context.user_data["schedule"] = room_schedule
+        available_rooms = formatting.check_same_rooms(fetch.fetch_room_id_by_name(room), room)
+
+        if len(available_rooms) > 1:
+            context.user_data["available_rooms"] = available_rooms
+            return send.send_room_clarity(update, context, True)
+
+        elif len(available_rooms) == 0:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Аудитория не найдена, попробуйте еще раз")
+
+        else:
+            context.user_data["available_rooms"] = None
+            room_name, room_id = available_rooms[0].split(':')
+
+            context.user_data["room"] = room_name
+            context.user_data["room_id"] = room_id
+
+            context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(room_id)
+            return send.send_week_selector(update, context, True)
+
+    else:
+        update.message.reply_text(
+            "Аудитория не найдена, попробуйте еще раз")
+
+
 def init_handlers(dispatcher):
     conv_handler = ConversationHandler(
         entry_points=[
+            MessageHandler(Filters.regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
+                           run_async=True),
             MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
         states={
-            GETNAME: [MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True)],
             GETDAY: [CallbackQueryHandler(got_day_handler, run_async=True)],
             GETWEEK: [CallbackQueryHandler(got_week_handler, run_async=True)],
-            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)]
+            TEACHER_CLARIFY: [CallbackQueryHandler(got_teacher_clarification_handler, run_async=True)],
+            ROOM_CLARIFY: [CallbackQueryHandler(got_room_clarification_handler, run_async=True)]
         },
         fallbacks=[
-            MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
+            MessageHandler(Filters.regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
+                           run_async=True),
+            MessageHandler(Filters.text, got_name_handler, run_async=True),
         ],
     )
 

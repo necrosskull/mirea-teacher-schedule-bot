@@ -11,7 +11,7 @@ import bot.lazy_logger as logger
 import bot.formats.formatting as formatting
 import bot.handlers.fetch as fetch
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
 
 def inlinequery(update: Update, context: CallbackContext):
