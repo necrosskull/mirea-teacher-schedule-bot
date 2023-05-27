@@ -33,7 +33,7 @@ def inlinequery(update: Update, context: CallbackContext):
              "query": query.lower(),
              **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
 
-        query = query.title()
+        query = query.lower()
 
         room_schedule = fetch.fetch_room_id_by_name(query)
 
