@@ -256,7 +256,7 @@ def got_room_handler(update: Update, context: CallbackContext):
     @return: Int код шага
     """
     context.user_data["state"] = "get_room"
-    room = update.message.text[4:].title()
+    room = update.message.text[4:].lower()
 
     logger.lazy_logger.info(json.dumps({"type": "request",
                                         "query": update.message.text.lower(),
