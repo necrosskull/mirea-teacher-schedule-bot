@@ -109,16 +109,23 @@ def send_day_selector(update: Update, context: CallbackContext):
         week = context.user_data["week"]
         schedule = context.user_data["schedule"]
 
-        room_workdays = construct.construct_teacher_workdays(week, schedule, room)
+        if schedule:
+            room_workdays = construct.construct_teacher_workdays(week, schedule, room)
 
-        update.callback_query.edit_message_text(
-            text=f"Выбрана аудитория: {room} \n" +
-                 f"Выбрана неделя: {week} \n" +
-                 f"Выберите день",
-            reply_markup=room_workdays
-        )
+            update.callback_query.edit_message_text(
+                text=f"Выбрана аудитория: {room} \n" +
+                     f"Выбрана неделя: {week} \n" +
+                     f"Выберите день",
+                reply_markup=room_workdays
+            )
 
-        return GETDAY
+            return GETDAY
+
+        else:
+            update.callback_query.answer(
+                text="Ошибка\n\nВ данной аудитории нет пар\nПожалуйста выберите другую аудиторию.", show_alert=True)
+            
+            return GETWEEK
 
     teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
     week = context.user_data["week"]
