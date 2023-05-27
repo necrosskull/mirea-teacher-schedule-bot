@@ -35,8 +35,15 @@ def format_outputs(parsed_schedule, context):
 
             if context.user_data["state"] == "get_room":
                 groups = ""
-                for teacher in schedule["teachers"]:
-                    teachers = ", ".join(decode.decode_teachers([teacher["name"]]))
+                if schedule["teachers"]:
+                    for teacher in schedule["teachers"]:
+                        if teacher["name"]:
+                            teachers = ", ".join(decode.decode_teachers([teacher["name"]]))
+                        else:
+                            teachers = ""
+                else:
+                    teachers = ""
+
             else:
                 groups = schedule["group"]["name"]
                 teachers = ", ".join(decode.decode_teachers(
@@ -68,27 +75,30 @@ def format_outputs(parsed_schedule, context):
             text = ""
 
         except Exception as e:
-
-            if str(e) == error_message:
-                logger.lazy_logger.error(json.dumps(
-                    {"type": "error",
-                     "teacher": context.user_data['teacher'],
-                     "week": context.user_data['week'],
-                     }, ensure_ascii=False))
-
+            if context.user_data["state"] == "get_room":
+                pass
             else:
-                error_message = str(e)
-                logger.lazy_logger.error(json.dumps(
-                    {"type": "error",
-                     "teacher": context.user_data['teacher'],
-                     "week": context.user_data['week'],
-                     }, ensure_ascii=False))
-                text += "Ошибка при получении расписания, сообщите об этом в техподдержку " \
-                        "@mirea_help_bot"
-                blocks.append(text)
-                text = ""
 
-                return blocks
+                if str(e) == error_message:
+                    logger.lazy_logger.error(json.dumps(
+                        {"type": "error",
+                         "teacher": context.user_data['teacher'],
+                         "week": context.user_data['week'],
+                         }, ensure_ascii=False))
+
+                else:
+                    error_message = str(e)
+                    logger.lazy_logger.error(json.dumps(
+                        {"type": "error",
+                         "teacher": context.user_data['teacher'],
+                         "week": context.user_data['week'],
+                         }, ensure_ascii=False))
+                    text += "Ошибка при получении расписания, сообщите об этом в техподдержку " \
+                            "@mirea_help_bot"
+                    blocks.append(text)
+                    text = ""
+
+                    return blocks
 
     return blocks
 
