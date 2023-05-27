@@ -258,6 +258,11 @@ def got_room_handler(update: Update, context: CallbackContext):
     context.user_data["state"] = "get_room"
     room = update.message.text[4:].title()
 
+    logger.lazy_logger.info(json.dumps({"type": "request",
+                                        "query": update.message.text.lower(),
+                                        **update.message.from_user.to_dict()},
+                                       ensure_ascii=False))
+
     room_schedule = fetch.fetch_room_id_by_name(room)
 
     if room_schedule:
