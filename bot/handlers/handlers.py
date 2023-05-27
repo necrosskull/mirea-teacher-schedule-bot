@@ -309,7 +309,7 @@ def init_handlers(dispatcher):
         fallbacks=[
             MessageHandler(Filters.regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
                            run_async=True),
-            MessageHandler(Filters.text, got_name_handler, run_async=True),
+            MessageHandler(Filters.text & ~Filters.command, got_name_handler, run_async=True),
         ],
     )
 
