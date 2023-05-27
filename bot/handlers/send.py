@@ -6,7 +6,7 @@ import bot.formats.formatting as formatting
 import bot.handlers.construct as construct
 import bot.handlers.fetch as fetch
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK = range(5)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
 
 def send_week_selector(
@@ -18,6 +18,26 @@ def send_week_selector(
     нового сообщения @param update: Update class of API @param context: CallbackContext of API @param firsttime:
     Впервые ли производится общение с пользователем @return: Статус следующего шага - GETWEEK
     """
+    if context.user_data["state"] == "get_room":
+        room = context.user_data["room"]
+
+        if firsttime:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"Выбрана аудитория: {room}\n" +
+                     f"Выберите неделю",
+                reply_markup=construct.construct_weeks_markup()
+            )
+
+        else:
+            update.callback_query.edit_message_text(
+                text=f"Выбрана аудитория: {room}\n" +
+                     f"Выберите неделю",
+                reply_markup=construct.construct_weeks_markup()
+            )
+
+        return GETWEEK
+
     teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
 
     if firsttime:
@@ -83,10 +103,27 @@ def send_day_selector(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Статус следующего шага - GETDAY
     """
+    if context.user_data["state"] == "get_room":
+        state = context.user_data["state"]
+        room = context.user_data["room"]
+        week = context.user_data["week"]
+        schedule = context.user_data["schedule"]
+
+        room_workdays = construct.construct_teacher_workdays(week, schedule, room)
+
+        update.callback_query.edit_message_text(
+            text=f"Выбрана аудитория: {room} \n" +
+                 f"Выбрана неделя: {week} \n" +
+                 f"Выберите день",
+            reply_markup=room_workdays
+        )
+
+        return GETDAY
+
     teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
     week = context.user_data["week"]
     schedule = context.user_data["schedule"]
-    teacher_workdays = construct.construct_teacher_workdays(teacher, week, schedule)
+    teacher_workdays = construct.construct_teacher_workdays(week, schedule, False)
 
     update.callback_query.edit_message_text(
         text=f"Выбран преподаватель: {teacher} \n" +
@@ -104,20 +141,37 @@ def send_result(update: Update, context: CallbackContext):
     В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
     Если user_data["week"]=-1 - выводится вся неделя
     """
-    week = context.user_data["week"]
-    weekday = context.user_data["day"]
-    schedule_data = context.user_data["schedule"]
-    teacher_surname = context.user_data["teacher"]
+    if context.user_data["state"] == "get_room":
+        room = context.user_data["room"]
+        week = context.user_data["week"]
+        weekday = context.user_data["day"]
+        schedule_data = context.user_data["schedule"]
 
-    parsed_schedule = formatting.parse(
-        schedule_data,
-        weekday,
-        week,
-        teacher_surname,
-        context)
+        parsed_schedule = formatting.parse(
+            schedule_data,
+            weekday,
+            week,
+            False,
+            context,
+            room)
+
+    else:
+
+        week = context.user_data["week"]
+        weekday = context.user_data["day"]
+        schedule_data = context.user_data["schedule"]
+        teacher_surname = context.user_data["teacher"]
+
+        parsed_schedule = formatting.parse(
+            schedule_data,
+            weekday,
+            week,
+            teacher_surname,
+            context,
+            False)
 
     parsed_schedule = formatting.remove_duplicates_merge_groups_with_same_lesson(
-        parsed_schedule)
+        parsed_schedule, context)
 
     parsed_schedule = formatting.merge_weeks_numbers(parsed_schedule)
 
@@ -135,14 +189,20 @@ def telegram_delivery_optimisation(
         blocks: list,
         update: Update,
         context: CallbackContext):
-    teacher = context.user_data["teacher"]
-
-    context.user_data["schedule"] = fetch.fetch_schedule_by_name(
-        context.user_data["teacher"])
-
-    schedule = context.user_data["schedule"]
     week = context.user_data["week"]
-    teacher_workdays = construct.construct_teacher_workdays(teacher, week, schedule)
+
+    if context.user_data["state"] == "get_room":
+        room = context.user_data["room"]
+        room_id = context.user_data["room_id"]
+        context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(room_id)
+        schedule = context.user_data["schedule"]
+        teacher_workdays = construct.construct_teacher_workdays(week, schedule, room)
+    else:
+
+        context.user_data["schedule"] = fetch.fetch_schedule_by_name(
+            context.user_data["teacher"])
+        schedule = context.user_data["schedule"]
+        teacher_workdays = construct.construct_teacher_workdays(week, schedule, False)
 
     chunk = ""
     first = True
@@ -180,3 +240,23 @@ def telegram_delivery_optimisation(
                 reply_markup=teacher_workdays)
 
     return GETDAY
+
+
+def send_room_clarity(update, context, firsttime=False):
+    available_rooms = context.user_data["available_rooms"]
+    few_rooms_markup = construct.construct_rooms_markup(available_rooms)
+
+    if firsttime:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Выберите аудиторию",
+            reply_markup=few_rooms_markup
+        )
+
+    else:
+        update.callback_query.edit_message_text(
+            text="Выберите аудиторию",
+            reply_markup=few_rooms_markup
+        )
+
+    return ROOM_CLARIFY
