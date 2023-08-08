@@ -21,7 +21,6 @@ def insert_new_user(update, context):
     )
 
     if not created:
-        print("User already exists")
         usr.username = user.username
         usr.first_name = user.first_name
         usr.last_name = user.last_name
