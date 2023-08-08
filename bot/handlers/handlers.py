@@ -16,6 +16,7 @@ from telegram.ext import (
 )
 
 import bot.lazy_logger as logger
+from bot.db.database import insert_new_user
 
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
@@ -27,6 +28,8 @@ def got_name_handler(update: Update, context: CallbackContext) -> int:
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
+    insert_new_user(update, context)
+
     context.user_data["state"] = "get_name"
     try:
         if update.message.via_bot:
@@ -255,6 +258,8 @@ def got_room_handler(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Int код шага
     """
+    insert_new_user(update, context)
+
     context.user_data["state"] = "get_room"
     room = update.message.text[4:].lower()
 
