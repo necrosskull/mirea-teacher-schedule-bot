@@ -1,11 +1,24 @@
+import itertools
+from datetime import datetime
 import bot.lazy_logger as logger
 import bot.formats.decode as decode
 import json
 
 
 def format_outputs(parsed_schedule, context):
-    from datetime import datetime
+    """
+    Format the parsed schedule into human-readable text blocks.
+
+    Parameters:
+    - parsed_schedule (list): List of dictionaries representing parsed schedule data.
+    - context (object): Context object containing user-specific data.
+
+    Returns:
+    - blocks (list): List of formatted text blocks.
+
+    """
     text = ""
+
     WEEKDAYS = {
         1: "Понедельник",
         2: "Вторник",
@@ -16,6 +29,20 @@ def format_outputs(parsed_schedule, context):
     }
 
     blocks = []
+    zipped_teachers = []
+    teachers = ""
+
+    if context.user_data["state"] == "get_name":
+        teachers = ", ".join(decode.decode_teachers(
+            [context.user_data["teacher"]]))
+
+    elif context.user_data["state"] == "get_room":
+        teacher_lists = [schedule.get("teachers", []) for schedule in parsed_schedule]
+        teacher_names = {teacher.get("name", "") for teacher in itertools.chain(*teacher_lists)}
+
+        teacher_list = list(teacher_names)
+        decoded_list = decode.decode_teachers(teacher_list)
+        zipped_teachers = list(zip(teacher_list, decoded_list))
 
     for schedule in parsed_schedule:
 
@@ -38,7 +65,7 @@ def format_outputs(parsed_schedule, context):
                 if schedule["teachers"]:
                     for teacher in schedule["teachers"]:
                         if teacher["name"]:
-                            teachers = ", ".join(decode.decode_teachers([teacher["name"]]))
+                            teachers = ", ".join([name[1] for name in zipped_teachers if name[0] == teacher["name"]])
                         else:
                             teachers = ""
                 else:
@@ -46,8 +73,6 @@ def format_outputs(parsed_schedule, context):
 
             else:
                 groups = schedule["group"]["name"]
-                teachers = ", ".join(decode.decode_teachers(
-                    [context.user_data["teacher"]]))
 
             time_start = datetime.strptime(
                 schedule['calls']['time_start'],
@@ -59,13 +84,13 @@ def format_outputs(parsed_schedule, context):
 
             formatted_time = f"{time_start} – {time_end}"
 
-            type = schedule["lesson_type"]["name"] if schedule["lesson_type"] else ""
+            lesson_type = schedule["lesson_type"]["name"] if schedule["lesson_type"] else ""
 
             text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
             text += f'📝 {schedule["discipline"]["name"]}\n'
             if len(groups) > 0:
                 text += f'👥 Группы: {groups}\n'
-            text += f'📚 Тип: {type}\n'
+            text += f'📚 Тип: {lesson_type}\n'
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
             text += f"🏫 Аудитории: {room}\n"
             text += f'📅 Недели: {schedule["weeks"]}\n'
