@@ -25,14 +25,14 @@ async def send_week_selector(
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=f"Выбрана аудитория: {room}\n" +
-                     f"Выберите неделю",
+                     f"Выберите неделю:",
                 reply_markup=construct.construct_weeks_markup()
             )
 
         else:
             await update.callback_query.edit_message_text(
                 text=f"Выбрана аудитория: {room}\n" +
-                     f"Выберите неделю",
+                     f"Выберите неделю:",
                 reply_markup=construct.construct_weeks_markup()
             )
 
@@ -44,14 +44,14 @@ async def send_week_selector(
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=f"Выбран преподаватель: {teacher}\n" +
-                 f"Выберите неделю",
+                 f"Выберите неделю:",
             reply_markup=construct.construct_weeks_markup()
         )
 
     else:
         await update.callback_query.edit_message_text(
             text=f"Выбран преподаватель: {teacher}\n" +
-                 f"Выберите неделю",
+                 f"Выберите неделю:",
             reply_markup=construct.construct_weeks_markup()
         )
 
@@ -115,10 +115,10 @@ async def send_day_selector(update: Update, context: CallbackContext):
             await update.callback_query.edit_message_text(
                 text=f"Выбрана аудитория: {room} \n" +
                      f"Выбрана неделя: {week} \n" +
-                     f"Выберите день",
+                     f"Выберите день:",
                 reply_markup=room_workdays
             )
-            
+
             return GETDAY
 
         else:
@@ -135,7 +135,7 @@ async def send_day_selector(update: Update, context: CallbackContext):
     await update.callback_query.edit_message_text(
         text=f"Выбран преподаватель: {teacher} \n" +
              f"Выбрана неделя: {week} \n" +
-             f"Выберите день",
+             f"Выберите день:",
         reply_markup=teacher_workdays
     )
 

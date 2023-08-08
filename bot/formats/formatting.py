@@ -141,7 +141,6 @@ def normalize_teachername(raw_teacher_name: str):
         last_name = name_parts[0]
         initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
         teacher = last_name + ' ' + initials
-        print(teacher)
 
     if " " not in teacher:
         teacher += " "
