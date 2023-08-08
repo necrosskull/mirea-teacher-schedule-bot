@@ -33,8 +33,10 @@ def construct_teacher_workdays(week: int, schedule: list, room):
         5: "ПТ",
         6: "СБ",
     }
-    ready_markup = InlineKeyboardMarkup([])
-    row_list = []
+
+    button_rows = []
+    row = []
+
     for i in range(1, 7):
         sign = ""
         callback = i
@@ -42,24 +44,22 @@ def construct_teacher_workdays(week: int, schedule: list, room):
         if i not in founded_days:
             sign = "⛔"
             callback = "chill"
-        row_list.append(
+
+        row.append(
             InlineKeyboardButton(
                 text=f"{sign}{weekdays[i]}{sign}",
-                callback_data=callback))
+                callback_data=callback
+            ))
 
-        if i % 3 == 0:
-            ready_markup.inline_keyboard.append(row_list)
-            row_list = []
+        if len(row) == 3 or i == 6:
+            button_rows.append(tuple(row))
+            row = []
 
-    if founded_days:  # добавляем кнопку "На неделю" только если есть пары на неделе
-        row_list.append(
-            InlineKeyboardButton(
-                text="На неделю",
-                callback_data="week"))
-        ready_markup.inline_keyboard.append(row_list)
-    row_list = []
-    row_list.append(InlineKeyboardButton(text="Назад", callback_data="back"))
-    ready_markup.inline_keyboard.append(row_list)
+    if founded_days:
+        button_rows.append((InlineKeyboardButton(text="На неделю", callback_data="week"),))
+
+    button_rows.append((InlineKeyboardButton(text="Назад", callback_data="back"),))
+    ready_markup = InlineKeyboardMarkup(button_rows)
 
     return ready_markup
 
@@ -116,39 +116,30 @@ def construct_weeks_markup():
                 today).days) <= day[ImportantDays.INTERVAL]:
             week_indicator = day[ImportantDays.SIGN]
 
-    reply_mark = InlineKeyboardMarkup([])
-    button_list = []
+    week_buttons = []
+    row_buttons = []
 
     for i in range(1, 18):
-        tmp_sign = ""
-        if current_week == i:
-            tmp_sign = week_indicator
-        button_list.append(
-            InlineKeyboardButton(
-                text=f"{tmp_sign}{i}{tmp_sign}",
-                callback_data=i))
+        button_text = f"{week_indicator}{i}{week_indicator}" if i == current_week else str(i)
+        row_buttons.append(InlineKeyboardButton(
+            text=button_text,
+            callback_data=i
+        ))
 
-        if i % 4 == 0 or i == 17:
-            reply_mark.inline_keyboard.append(button_list)
-            button_list = []
+        if len(row_buttons) == 4 or i == 17:
+            week_buttons.append(tuple(row_buttons))
+            row_buttons = []
 
-    backspace = []
+    date_buttons = [
+        [
+            InlineKeyboardButton("Сегодня", callback_data="today"),
+            InlineKeyboardButton("Завтра", callback_data="tomorrow"),
+        ],
+        [
+            InlineKeyboardButton("Назад", callback_data="back")
+        ]
+    ]
 
-    backspace.append(
-        InlineKeyboardButton(
-            text="Сегодня",
-            callback_data="today"))
-
-    backspace.append(
-        InlineKeyboardButton(
-            text="Завтра",
-            callback_data="tomorrow"))
-
-    reply_mark.inline_keyboard.append(backspace)
-
-    backspace = []
-
-    backspace.append(InlineKeyboardButton(text="Назад", callback_data="back"))
-    reply_mark.inline_keyboard.append(backspace)
+    reply_mark = InlineKeyboardMarkup(week_buttons + date_buttons)
 
     return reply_mark

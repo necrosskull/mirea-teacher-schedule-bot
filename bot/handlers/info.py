@@ -2,11 +2,11 @@ from telegram import Update
 from telegram.ext import CallbackContext, CommandHandler
 
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: CallbackContext):
     """
     Привествие бота при использовании команды /start
     """
-    context.bot.send_message(
+    await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="Привет!\nЯ бот, который поможет вам найти "
              "расписание любого *преподавателя.*\nНапишите мне "
@@ -21,11 +21,11 @@ def start(update: Update, context: CallbackContext):
         parse_mode="Markdown")
 
 
-def about(update: Update, context: CallbackContext):
+async def about(update: Update, context: CallbackContext):
     """
     Информация о боте при использовании команды /about
     """
-    context.bot.send_message(
+    await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="*MIREA Teacher Schedule Bot*\n"
              "*Разработан Mirea Ninja*\n\n"
@@ -33,7 +33,7 @@ def about(update: Update, context: CallbackContext):
         parse_mode="Markdown")
 
 
-def init_handlers(dispatcher):
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("about", about))
-    dispatcher.add_handler(CommandHandler("help", start))
+def init_handlers(application):
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("about", about))
+    application.add_handler(CommandHandler("help", start))

@@ -1,6 +1,6 @@
 import bot.config as config
 import logging
-from telegram.ext import Updater
+from telegram.ext import Application
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
@@ -9,9 +9,8 @@ def main() -> None:
     """Start the bot."""
     from bot import setup
 
-    updater = Updater(config.TELEGRAM_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
+    application = Application.builder().token(config.TELEGRAM_TOKEN).build()
 
-    setup.setup(dispatcher)
-    updater.start_polling()
-    updater.idle()
+    setup.setup(application)
+
+    application.run_polling()

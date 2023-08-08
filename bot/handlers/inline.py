@@ -14,7 +14,7 @@ import bot.handlers.fetch as fetch
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
 
-def inlinequery(update: Update, context: CallbackContext):
+async def inlinequery(update: Update, context: CallbackContext):
     """
     Обработчик инлайн запросов
     Создает Inline отображение
@@ -62,7 +62,7 @@ def inlinequery(update: Update, context: CallbackContext):
                 reply_markup=construct.construct_weeks_markup(),
             ))
 
-        update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
+        await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
     else:
         context.user_data["state"] = "get_name"
@@ -112,10 +112,10 @@ def inlinequery(update: Update, context: CallbackContext):
 
             ))
 
-        update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
+        await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
 
-def answer_inline_handler(update: Update, context: CallbackContext):
+async def answer_inline_handler(update: Update, context: CallbackContext):
     """
     В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
     и выставляет текущий шаг Inline запроса на ask_day
@@ -135,12 +135,12 @@ def answer_inline_handler(update: Update, context: CallbackContext):
         return
 
 
-def inline_dispatcher(update: Update, context: CallbackContext):
+async def inline_dispatcher(update: Update, context: CallbackContext):
     """
     Обработка вызовов в чатах на основании Callback вызова
     """
     if "inline_step" not in context.user_data:
-        deny_inline_usage(update)
+        await deny_inline_usage(update)
         return
 
     # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
@@ -148,12 +148,12 @@ def inline_dispatcher(update: Update, context: CallbackContext):
 
     if update.callback_query.inline_message_id and update.callback_query.inline_message_id != \
             context.user_data["inline_message_id"]:
-        deny_inline_usage(update)
+        await deny_inline_usage(update)
         return
 
     status = context.user_data["inline_step"]
     if status == InlineStep.EInlineStep.completed or status == InlineStep.EInlineStep.ask_teacher:
-        deny_inline_usage(update)
+        await deny_inline_usage(update)
         return
 
     if status == InlineStep.EInlineStep.ask_week:
@@ -165,7 +165,7 @@ def inline_dispatcher(update: Update, context: CallbackContext):
             context.user_data["schedule"] = fetch.fetch_schedule_by_name(
                 context.user_data["teacher"])
 
-        target = handlers.got_week_handler(update, context)
+        target = await handlers.got_week_handler(update, context)
 
         if target == GETDAY:
             context.user_data["inline_step"] = InlineStep.EInlineStep.ask_day
@@ -174,7 +174,7 @@ def inline_dispatcher(update: Update, context: CallbackContext):
             context.user_data["inline_step"] = InlineStep.EInlineStep.ask_day
 
     if status == InlineStep.EInlineStep.ask_day:
-        target = handlers.got_day_handler(update, context)
+        target = await handlers.got_day_handler(update, context)
         if target == GETWEEK:
             if context.user_data["state"] == "get_room":
                 context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(context.user_data["room_id"])
@@ -188,17 +188,17 @@ def inline_dispatcher(update: Update, context: CallbackContext):
         return
 
 
-def deny_inline_usage(update: Update):
+async def deny_inline_usage(update: Update):
     """
     Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
     """
-    update.callback_query.answer(
+    await update.callback_query.answer(
         text="Вы не можете использовать это меню, т.к. оно не относится к вашему запросу",
         show_alert=True)
     return
 
 
-def init_handlers(dispatcher):
-    dispatcher.add_handler(InlineQueryHandler(inlinequery, run_async=True))
-    dispatcher.add_handler(ChosenInlineResultHandler(answer_inline_handler, run_async=True))
-    dispatcher.add_handler(CallbackQueryHandler(inline_dispatcher, run_async=True))
+def init_handlers(application):
+    application.add_handler(InlineQueryHandler(inlinequery, block=False))
+    application.add_handler(ChosenInlineResultHandler(answer_inline_handler, block=False))
+    application.add_handler(CallbackQueryHandler(inline_dispatcher, block=False))

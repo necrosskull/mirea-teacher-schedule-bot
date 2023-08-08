@@ -9,7 +9,7 @@ import bot.handlers.fetch as fetch
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
 
-def send_week_selector(
+async def send_week_selector(
         update: Update,
         context: CallbackContext,
         firsttime=False):
@@ -22,7 +22,7 @@ def send_week_selector(
         room = context.user_data["room"]
 
         if firsttime:
-            context.bot.send_message(
+            await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=f"Выбрана аудитория: {room}\n" +
                      f"Выберите неделю",
@@ -30,7 +30,7 @@ def send_week_selector(
             )
 
         else:
-            update.callback_query.edit_message_text(
+            await update.callback_query.edit_message_text(
                 text=f"Выбрана аудитория: {room}\n" +
                      f"Выберите неделю",
                 reply_markup=construct.construct_weeks_markup()
@@ -41,7 +41,7 @@ def send_week_selector(
     teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
 
     if firsttime:
-        context.bot.send_message(
+        await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=f"Выбран преподаватель: {teacher}\n" +
                  f"Выберите неделю",
@@ -49,7 +49,7 @@ def send_week_selector(
         )
 
     else:
-        update.callback_query.edit_message_text(
+        await update.callback_query.edit_message_text(
             text=f"Выбран преподаватель: {teacher}\n" +
                  f"Выберите неделю",
             reply_markup=construct.construct_weeks_markup()
@@ -58,17 +58,17 @@ def send_week_selector(
     return GETWEEK
 
 
-def resend_name_input(update: Update, context: CallbackContext):
+async def resend_name_input(update: Update, context: CallbackContext):
     """
     Просит ввести имя преподавателя заново
     @param update: Update class of API
     @param context: CallbackContext of API
     @return: Статус следующего шага - GETNAME
     """
-    update.callback_query.answer(text="Введите новую фамилию", show_alert=True)
+    await update.callback_query.answer(text="Введите новую фамилию", show_alert=True)
 
 
-def send_teacher_clarity(
+async def send_teacher_clarity(
         update: Update,
         context: CallbackContext,
         firsttime=False):
@@ -81,14 +81,14 @@ def send_teacher_clarity(
     few_teachers_markup = construct.construct_teacher_markup(available_teachers)
 
     if firsttime:
-        context.bot.send_message(
+        await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите преподвателя",
             reply_markup=few_teachers_markup
         )
 
     else:
-        update.callback_query.edit_message_text(
+        await update.callback_query.edit_message_text(
             text="Выберите преподвателя",
             reply_markup=few_teachers_markup
         )
@@ -96,7 +96,7 @@ def send_teacher_clarity(
     return TEACHER_CLARIFY
 
 
-def send_day_selector(update: Update, context: CallbackContext):
+async def send_day_selector(update: Update, context: CallbackContext):
     """
     Отправляет селектор дня недели с указанием дней, когда преподаватель не имеет пар.
     @param update: Update class of API
@@ -112,19 +112,19 @@ def send_day_selector(update: Update, context: CallbackContext):
         if schedule:
             room_workdays = construct.construct_teacher_workdays(week, schedule, room)
 
-            update.callback_query.edit_message_text(
+            await update.callback_query.edit_message_text(
                 text=f"Выбрана аудитория: {room} \n" +
                      f"Выбрана неделя: {week} \n" +
                      f"Выберите день",
                 reply_markup=room_workdays
             )
-
+            
             return GETDAY
 
         else:
-            update.callback_query.answer(
+            await update.callback_query.answer(
                 text="Ошибка\n\nВ данной аудитории нет пар\nПожалуйста выберите другую аудиторию.", show_alert=True)
-            
+
             return GETWEEK
 
     teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
@@ -132,7 +132,7 @@ def send_day_selector(update: Update, context: CallbackContext):
     schedule = context.user_data["schedule"]
     teacher_workdays = construct.construct_teacher_workdays(week, schedule, False)
 
-    update.callback_query.edit_message_text(
+    await update.callback_query.edit_message_text(
         text=f"Выбран преподаватель: {teacher} \n" +
              f"Выбрана неделя: {week} \n" +
              f"Выберите день",
@@ -142,7 +142,7 @@ def send_day_selector(update: Update, context: CallbackContext):
     return GETDAY
 
 
-def send_result(update: Update, context: CallbackContext):
+async def send_result(update: Update, context: CallbackContext):
     """
     Выводит результат пользователю.
     В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
@@ -183,16 +183,16 @@ def send_result(update: Update, context: CallbackContext):
     parsed_schedule = formatting.merge_weeks_numbers(parsed_schedule)
 
     if len(parsed_schedule) == 0:
-        update.callback_query.answer(
+        await update.callback_query.answer(
             text="В этот день пар нет.", show_alert=True)
         return GETWEEK
 
     blocks_of_text = formatting.format_outputs(parsed_schedule, context)
 
-    return telegram_delivery_optimisation(blocks_of_text, update, context)
+    return await telegram_delivery_optimisation(blocks_of_text, update, context)
 
 
-def telegram_delivery_optimisation(
+async def telegram_delivery_optimisation(
         blocks: list,
         update: Update,
         context: CallbackContext):
@@ -221,27 +221,27 @@ def telegram_delivery_optimisation(
         else:
             if first:
                 if update.callback_query.inline_message_id:
-                    update.callback_query.answer(
+                    await update.callback_query.answer(
                         text="Слишком длинное расписание, пожалуйста, воспользуйтесь личными сообщениями бота или "
                              "выберите конкретный день недели", show_alert=True)
                     break
 
-                update.callback_query.edit_message_text(chunk)
+                await update.callback_query.edit_message_text(chunk)
                 first = False
 
             else:
-                context.bot.send_message(
+                await context.bot.send_message(
                     chat_id=update.effective_chat.id, text=chunk)
 
             chunk = block
 
     if chunk:
         if first:
-            update.callback_query.edit_message_text(
+            await update.callback_query.edit_message_text(
                 chunk, reply_markup=teacher_workdays)
 
         else:
-            context.bot.send_message(
+            await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=chunk,
                 reply_markup=teacher_workdays)
@@ -249,19 +249,19 @@ def telegram_delivery_optimisation(
     return GETDAY
 
 
-def send_room_clarity(update, context, firsttime=False):
+async def send_room_clarity(update, context, firsttime=False):
     available_rooms = context.user_data["available_rooms"]
     few_rooms_markup = construct.construct_rooms_markup(available_rooms)
 
     if firsttime:
-        context.bot.send_message(
+        await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите аудиторию",
             reply_markup=few_rooms_markup
         )
 
     else:
-        update.callback_query.edit_message_text(
+        await update.callback_query.edit_message_text(
             text="Выберите аудиторию",
             reply_markup=few_rooms_markup
         )
