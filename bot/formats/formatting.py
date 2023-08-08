@@ -135,6 +135,13 @@ def normalize_teachername(raw_teacher_name: str):
     @return: Фамилия начинаяющая с большой буквы и с пробелом в конце
     """
     teacher = raw_teacher_name.title()
+    name_parts = teacher.split()
+
+    if len(name_parts) > 1:
+        last_name = name_parts[0]
+        initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
+        teacher = last_name + ' ' + initials
+        print(teacher)
 
     if " " not in teacher:
         teacher += " "
