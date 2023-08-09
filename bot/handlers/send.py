@@ -83,13 +83,13 @@ async def send_teacher_clarity(
     if firsttime:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Выберите преподвателя",
+            text="Выберите преподавателя:",
             reply_markup=few_teachers_markup
         )
 
     else:
         await update.callback_query.edit_message_text(
-            text="Выберите преподвателя",
+            text="Выберите преподавателя:",
             reply_markup=few_teachers_markup
         )
 
