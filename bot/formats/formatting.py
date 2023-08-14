@@ -200,8 +200,6 @@ def parse(teacher_schedule, weekday, week_number, teacher, context, room):
 
         return filtered_schedule
 
-
-
     else:
         context.user_data["teacher"] = teacher
 
@@ -216,7 +214,7 @@ def parse(teacher_schedule, weekday, week_number, teacher, context, room):
                     lesson['group']['name']),
                 reverse=False)
 
-            if (weekday != -1):
+            if weekday != -1:
                 teacher_schedule = list(
                     filter(
                         lambda lesson: lesson['weekday'] == int(weekday),
