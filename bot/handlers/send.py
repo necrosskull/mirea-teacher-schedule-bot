@@ -111,11 +111,12 @@ async def send_day_selector(update: Update, context: CallbackContext):
 
         if schedule:
             room_workdays = construct.construct_teacher_workdays(week, schedule, room)
-
+            
             await update.callback_query.edit_message_text(
                 text=f"Выбрана аудитория: {room} \n" +
                      f"Выбрана неделя: {week} \n" +
                      f"Выберите день:",
+
                 reply_markup=room_workdays
             )
 
