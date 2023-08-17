@@ -172,3 +172,4 @@ rassilka.py
 test2.py
 bot/cmstest.py
 bot/handlers/roomtester.py
+bot/db/data/bot.db

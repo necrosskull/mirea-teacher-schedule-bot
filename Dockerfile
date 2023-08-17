@@ -1,9 +1,9 @@
-FROM python:3.11-slim-bullseye AS python
+FROM python:3.11.4-slim-bullseye AS python
 
 # Poetry configuration
 ENV POETRY_HOME="/opt/poetry" \
     POETRY_NO_INTERACTION=1 \
-    POETRY_VERSION=1.2.2 \
+    POETRY_VERSION=1.4.2 \
     POETRY_VIRTUALENVS_CREATE=false
 
 # Install poetry
@@ -18,6 +18,9 @@ COPY pyproject.toml poetry.lock ./
 # Install dependencies
 RUN poetry install --no-dev --no-root --no-interaction --no-ansi
 
+RUN if [ -e "./bot/db/data/bot.db" ]; then \
+        cp ./bot/db/data/bot.db /app/bot/db/data/bot.db; \
+    fi
 # Copy the rest of the project
 COPY . .
 

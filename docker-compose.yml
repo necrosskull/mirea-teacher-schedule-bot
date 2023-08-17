@@ -7,3 +7,5 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    volumes:
+      - ./bot/db/data:/app/bot/db/data
