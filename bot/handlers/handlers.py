@@ -28,15 +28,14 @@ async def got_name_handler(update: Update, context: CallbackContext):
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
+    if update.message and update.message.via_bot:
+        return
+    elif update.edited_message and update.edited_message.via_bot:
+        return
+
     insert_new_user(update, context)
 
     context.user_data["state"] = "get_name"
-    try:
-        if update.message.via_bot:
-            return ConversationHandler.END
-
-    except AttributeError:
-        return ConversationHandler.END
 
     inputted_teacher = update.message.text
     logger.lazy_logger.info(json.dumps({"type": "request",
