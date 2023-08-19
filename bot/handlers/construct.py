@@ -5,6 +5,8 @@ import datetime as datetime
 
 import bot.formats.decode as decode
 
+from bot.schedule.week import get_current_week_number
+
 
 def construct_teacher_workdays(week: int, schedule: list, room):
     """
@@ -105,9 +107,7 @@ def construct_weeks_markup():
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
     если текущий день соответствует некоторой памятной дате+-интервал
     """
-    req = requests.get(
-        "https://schedule.mirea.ninja/api/schedule/current_week").json()
-    current_week = req["week"]
+    current_week = get_current_week_number()
     week_indicator = "●"
     today = datetime.date.today()
 

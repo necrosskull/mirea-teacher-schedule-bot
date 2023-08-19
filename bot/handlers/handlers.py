@@ -17,6 +17,7 @@ from telegram.ext import (
 
 import bot.lazy_logger as logger
 from bot.db.database import insert_new_user
+from bot.schedule.week import get_current_week_number
 
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
 
@@ -178,9 +179,7 @@ async def got_week_handler(update: Update, context: CallbackContext) -> Any | No
 
     elif selected_button == "today" or selected_button == "tomorrow":
         today = datetime.date.today().weekday()
-        req = requests.get(
-            "https://schedule.mirea.ninja/api/schedule/current_week").json()
-        week = req["week"]
+        week = get_current_week_number()
 
         if selected_button == "tomorrow":
             if today == 6:
