@@ -82,6 +82,17 @@ async def inlinequery(update: Update, context: CallbackContext):
              **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
 
         query = query.title()
+
+        if len(query) < 3:
+            return
+
+        name_parts = query.split()
+
+        if len(name_parts) > 1:
+            last_name = name_parts[0]
+            initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
+            query = last_name + ' ' + initials
+
         teacher_schedule = fetch.fetch_schedule_by_name(query)
 
         if teacher_schedule is None:
