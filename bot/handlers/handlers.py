@@ -199,7 +199,7 @@ async def got_week_handler(update: Update, context: CallbackContext) -> Any | No
         context.user_data["week"] = week
         context.user_data["day"] = today
 
-        return await send.send_result(update, context)
+        return await send.send_result(update, context, None)
 
     if selected_button.isdigit():
         selected_week = int(selected_button)
@@ -251,7 +251,7 @@ async def got_day_handler(update: Update, context: CallbackContext):
         return GETDAY
 
     try:
-        await send.send_result(update, context)
+        await send.send_result(update, context, selected_day)
 
     except Exception as e:
         await update.callback_query.answer(

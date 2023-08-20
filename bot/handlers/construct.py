@@ -8,7 +8,7 @@ import bot.formats.decode as decode
 from bot.schedule.week import get_current_week_number
 
 
-def construct_teacher_workdays(week: int, schedule: list, room):
+def construct_teacher_workdays(week: int, schedule: list, room, day=None):
     """
     Создает Inline клавиатуру с днями недели, когда у преподавателя есть пары.
     В случае если у преподавателя есть пары, то колбэк кнопки равен дню недели
@@ -16,6 +16,7 @@ def construct_teacher_workdays(week: int, schedule: list, room):
     @param week: Номер недели
     @param schedule: Расписание в JSON
     @param room: Название аудитории
+    @param day: Номер дня недели
     @return: InlineKeyboard со стилизованными кнопками
     """
 
@@ -46,6 +47,9 @@ def construct_teacher_workdays(week: int, schedule: list, room):
         if i not in founded_days:
             sign = "⛔"
             callback = "chill"
+
+        if day and i == day:
+            sign = "●"
 
         row.append(
             InlineKeyboardButton(

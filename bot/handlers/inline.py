@@ -50,14 +50,15 @@ async def inlinequery(update: Update, context: CallbackContext):
 
         userid = str(update.inline_query.from_user.id)
 
-        for room in avaliable_rooms:
+        for room in avaliable_rooms[:10]:
             room_name, room_id = room.split(":")
             inline_results.append(InlineQueryResultArticle(
                 id=room_id,
                 title=room_name,
                 description="Нажми, чтобы посмотреть расписание",
                 input_message_content=InputTextMessageContent(
-                    message_text=f"Выбрана аудитория: {room_name}!"
+                    message_text=f"Выбрана аудитория: {room_name}!\n" +
+                                 f"Выберите неделю:"
                 ),
                 reply_markup=construct.construct_weeks_markup(),
             ))
@@ -82,15 +83,22 @@ async def inlinequery(update: Update, context: CallbackContext):
 
         query = query.title()
 
-        if " " not in query:
-            query += " "
+        if len(query) < 3:
+            return
+
+        name_parts = query.split()
+
+        if len(name_parts) > 1:
+            last_name = name_parts[0]
+            initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
+            query = last_name + ' ' + initials
 
         teacher_schedule = fetch.fetch_schedule_by_name(query)
 
         if teacher_schedule is None:
             return
 
-        surnames = formatting.check_same_surnames(teacher_schedule, query)
+        surnames = formatting.check_same_surnames(teacher_schedule, query)[:10]
 
         if len(surnames) == 0:
             return
@@ -106,7 +114,8 @@ async def inlinequery(update: Update, context: CallbackContext):
                 title=decoded_surname,
                 description="Нажми, чтобы посмотреть расписание",
                 input_message_content=InputTextMessageContent(
-                    message_text=f"Выбран преподаватель: {decoded_surname}!"
+                    message_text=f"Выбран преподаватель: {decoded_surname}!\n" +
+                                 f"Выберите неделю:"
                 ),
                 reply_markup=construct.construct_weeks_markup(),
 
