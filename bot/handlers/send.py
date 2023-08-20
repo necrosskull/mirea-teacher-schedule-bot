@@ -111,7 +111,7 @@ async def send_day_selector(update: Update, context: CallbackContext):
 
         if schedule:
             room_workdays = construct.construct_teacher_workdays(week, schedule, room)
-            
+
             await update.callback_query.edit_message_text(
                 text=f"Выбрана аудитория: {room} \n" +
                      f"Выбрана неделя: {week} \n" +
@@ -143,7 +143,7 @@ async def send_day_selector(update: Update, context: CallbackContext):
     return GETDAY
 
 
-async def send_result(update: Update, context: CallbackContext):
+async def send_result(update: Update, context: CallbackContext, selected_day):
     """
     Выводит результат пользователю.
     В user_data["week"] и user_data["day"] должны быть заполнены перед вызовом!
@@ -190,13 +190,13 @@ async def send_result(update: Update, context: CallbackContext):
 
     blocks_of_text = formatting.format_outputs(parsed_schedule, context)
 
-    return await telegram_delivery_optimisation(blocks_of_text, update, context)
+    return await telegram_delivery_optimisation(blocks_of_text, update, context, selected_day)
 
 
 async def telegram_delivery_optimisation(
         blocks: list,
         update: Update,
-        context: CallbackContext):
+        context: CallbackContext, selected_day):
     week = context.user_data["week"]
 
     if context.user_data["state"] == "get_room":
@@ -204,13 +204,13 @@ async def telegram_delivery_optimisation(
         room_id = context.user_data["room_id"]
         context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(room_id)
         schedule = context.user_data["schedule"]
-        teacher_workdays = construct.construct_teacher_workdays(week, schedule, room)
+        teacher_workdays = construct.construct_teacher_workdays(week, schedule, room, day=selected_day)
     else:
 
         context.user_data["schedule"] = fetch.fetch_schedule_by_name(
             context.user_data["teacher"])
         schedule = context.user_data["schedule"]
-        teacher_workdays = construct.construct_teacher_workdays(week, schedule, False)
+        teacher_workdays = construct.construct_teacher_workdays(week, schedule, False, day=selected_day)
 
     chunk = ""
     first = True
