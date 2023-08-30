@@ -2,7 +2,6 @@ import datetime
 import json
 from typing import Any
 import re
-import requests
 import bot.formats.formatting as formatting
 import bot.handlers.send as send
 import bot.handlers.fetch as fetch
@@ -35,6 +34,10 @@ async def got_name_handler(update: Update, context: CallbackContext):
         return
 
     insert_new_user(update, context)
+
+    if context.bot_data["maintenance_mode"]:
+        await maintenance_message(update, context)
+        return
 
     context.user_data["state"] = "get_name"
 
@@ -272,6 +275,10 @@ async def got_room_handler(update: Update, context: CallbackContext):
     """
     insert_new_user(update, context)
 
+    if context.bot_data["maintenance_mode"]:
+        await maintenance_message(update, context)
+        return
+
     context.user_data["state"] = "get_room"
     room = update.message.text[4:].lower()
 
@@ -308,6 +315,13 @@ async def got_room_handler(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text(
             "Аудитория не найдена, попробуйте еще раз")
+
+
+async def maintenance_message(update: Update, context: CallbackContext):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Бот находится на техническом обслуживании, скоро всё заработает!",
+    )
 
 
 def init_handlers(application):
