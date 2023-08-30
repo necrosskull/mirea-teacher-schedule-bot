@@ -19,7 +19,9 @@ async def inlinequery(update: Update, context: CallbackContext):
     Обработчик инлайн запросов
     Создает Inline отображение
     """
-
+    if context.user_data["maintenance_mode"]:
+        return
+    
     if "ауд" in update.inline_query.query.lower():
         query = update.inline_query.query[4:]
         context.user_data["state"] = "get_room"
