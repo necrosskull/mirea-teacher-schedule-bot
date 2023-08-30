@@ -139,7 +139,14 @@ def normalize_teachername(raw_teacher_name: str):
 
     if len(name_parts) > 1:
         last_name = name_parts[0]
-        initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
+
+        # Для запроса вида "Иванов И.И. или Иванов И.И"
+        if name_parts[1][-1] == "." or len(name_parts[1]) > 1 and name_parts[1][-2] == ".":
+            initials = name_parts[1]
+        else:
+            # Для запроса вида "Иванов Иван Иванович и прочих"
+            initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
+
         teacher = last_name + ' ' + initials
 
     if " " not in teacher:

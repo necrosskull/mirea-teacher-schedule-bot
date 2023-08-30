@@ -1,5 +1,7 @@
 import requests
 
+from bot.config import api_url
+
 
 def fetch_schedule_by_name(teacher_name):
     """
@@ -8,7 +10,7 @@ def fetch_schedule_by_name(teacher_name):
     @return: JSON расписание или None если преподаватель не найден
     """
 
-    url = f"https://timetable.mirea.ru/api/teacher/search/{teacher_name}"
+    url = f"{api_url}/api/teachers/search/{teacher_name}"
 
     try:
         response = requests.get(url)
@@ -25,7 +27,7 @@ def fetch_room_id_by_name(room_name):
     @return: JSON расписание или None если аудитория не найдена
     """
 
-    url = f"https://timetable.mirea.ru/api/room/search/{room_name}"
+    url = f"{api_url}/api/rooms/search/{room_name}"
 
     try:
         response = requests.get(url)
@@ -51,7 +53,7 @@ def fetch_room_schedule_by_id(room_id):
     @return: JSON расписание или None если аудитория не найдена
     """
 
-    url = f"https://timetable.mirea.ru/api/schedule/room/{room_id}"
+    url = f"{api_url}/api/lessons/rooms/{room_id}"
 
     try:
         response = requests.get(url)
