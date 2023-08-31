@@ -370,7 +370,7 @@ async def maintenance_message(update: Update, context: CallbackContext):
 def init_handlers(application):
     conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
+            MessageHandler(filters.Regex(pattern=re.compile(r'^ауд (.+)', re.IGNORECASE)), got_room_handler,
                            block=False),
             MessageHandler(filters.Regex(pattern=re.compile(r'^[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
                            got_group_handler,
@@ -384,7 +384,7 @@ def init_handlers(application):
             ROOM_CLARIFY: [CallbackQueryHandler(got_room_clarification_handler, block=False)]
         },
         fallbacks=[
-            MessageHandler(filters.Regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
+            MessageHandler(filters.Regex(pattern=re.compile(r'^ауд (.+)', re.IGNORECASE)), got_room_handler,
                            block=False),
             MessageHandler(filters.Regex(pattern=re.compile(r'^[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
                            got_group_handler,
