@@ -70,3 +70,29 @@ def fetch_room_schedule_by_id(room_id):
 
     except requests.RequestException:
         return None
+
+
+def fetch_schedule_by_group(group_name):
+    """
+    Получение информации о расписании через API Mirea Ninja
+    @param group_name: Номер группы
+    @return: JSON расписание или None если группа не найдена
+    """
+
+    url = f"{api_url}/api/groups/name/{group_name}"
+
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if len(data) > 0:
+                all_groups = data
+
+                return all_groups
+            else:
+                return None
+        else:
+            return None
+
+    except requests.RequestException:
+        return None

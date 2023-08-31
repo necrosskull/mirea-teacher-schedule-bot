@@ -36,7 +36,7 @@ def format_outputs(parsed_schedule, context):
         teachers = ", ".join(decode.decode_teachers(
             [context.user_data["teacher"]]))
 
-    elif context.user_data["state"] == "get_room":
+    else:
         teacher_lists = [schedule.get("teachers", []) for schedule in parsed_schedule]
         teacher_names = {teacher.get("name", "") for teacher in itertools.chain(*teacher_lists)}
 
@@ -60,7 +60,7 @@ def format_outputs(parsed_schedule, context):
 
             weekday = WEEKDAYS[schedule["weekday"]]
 
-            if context.user_data["state"] == "get_room":
+            if context.user_data["state"] != "get_name":
                 if schedule["teachers"]:
                     for teacher in schedule["teachers"]:
                         if teacher["name"]:
@@ -105,7 +105,7 @@ def format_outputs(parsed_schedule, context):
                     "week": context.user_data['week']
 
                 }
-            else:
+            elif context.user_data["state"] == "get_name":
 
                 target_info = {
                     "type": "error",
@@ -113,6 +113,20 @@ def format_outputs(parsed_schedule, context):
                     "week": context.user_data['week']
 
                 }
+            elif context.user_data["state"] == "get_group":
+
+                target_info = {
+                    "type": "error",
+                    "group": context.user_data['group'],
+                    "week": context.user_data['week']
+
+                }
+
+            else:
+                target_info = {
+                    "type": "error",
+                }
+
             if str(e) != error_message:
                 error_message = str(e)
                 logger.lazy_logger.error(json.dumps(target_info, ensure_ascii=False))
@@ -172,10 +186,43 @@ def check_same_surnames(teacher_schedule, surname):
     return surnames
 
 
-def parse(teacher_schedule, weekday, week_number, teacher, context, room):
+def parse(teacher_schedule, weekday, week_number, context, teacher=None, room=None, group=None):
     if room:
         context.user_data["room"] = room
         filtered_schedule = teacher_schedule
+
+        filtered_schedule = sorted(
+            filtered_schedule,
+            key=lambda lesson: (
+                lesson['weekday'],
+                lesson['calls']['num'],
+                lesson['discipline']['name']
+            ),
+            reverse=False
+        )
+
+        if weekday != -1:
+            filtered_schedule = list(
+                filter(
+                    lambda lesson: lesson['weekday'] == int(weekday),
+                    filtered_schedule
+                )
+            )
+
+        filtered_schedule = list(
+            filter(
+                lambda lesson: int(week_number) in lesson['weeks'],
+                filtered_schedule
+            )
+        )
+
+        return filtered_schedule
+
+    elif group:
+
+        context.user_data["group"] = group
+
+        filtered_schedule = teacher_schedule["lessons"]
 
         filtered_schedule = sorted(
             filtered_schedule,

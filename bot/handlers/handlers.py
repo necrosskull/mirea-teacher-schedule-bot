@@ -167,10 +167,15 @@ async def got_week_handler(update: Update, context: CallbackContext) -> Any | No
 
     if selected_button == "back":
         if context.user_data['state'] == "get_room":
+
             if context.user_data['available_rooms'] is not None:
                 return await send.send_room_clarity(update, context)
             else:
                 return await send.resend_name_input(update, context)
+
+        elif context.user_data['state'] == "get_group":
+            return await send.resend_name_input(update, context)
+
         else:
 
             if context.user_data['available_teachers'] is not None:
@@ -317,6 +322,34 @@ async def got_room_handler(update: Update, context: CallbackContext):
             "Аудитория не найдена, попробуйте еще раз")
 
 
+async def got_group_handler(update: Update, context: CallbackContext):
+    insert_new_user(update, context)
+
+    if context.bot_data["maintenance_mode"]:
+        await maintenance_message(update, context)
+        return
+
+    context.user_data["state"] = "get_group"
+
+    inputted_group = update.message.text.upper()
+
+    logger.lazy_logger.info(json.dumps({"type": "request",
+                                        "query": inputted_group,
+                                        **update.message.from_user.to_dict()},
+                                       ensure_ascii=False))
+
+    group_schedule = fetch.fetch_schedule_by_group(inputted_group)
+
+    if group_schedule:
+        context.user_data["schedule"] = group_schedule
+        context.user_data["group"] = inputted_group
+        return await send.send_week_selector(update, context, True)
+
+    else:
+        await update.message.reply_text(
+            "Группа не найдена, попробуйте еще раз")
+
+
 async def maintenance_message(update: Update, context: CallbackContext):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
@@ -329,6 +362,9 @@ def init_handlers(application):
         entry_points=[
             MessageHandler(filters.Regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
                            block=False),
+            MessageHandler(filters.Regex(pattern=re.compile(r'[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
+                           got_group_handler,
+                           block=False),
             MessageHandler(filters.TEXT & ~filters.COMMAND, got_name_handler, block=False),
         ],
         states={
@@ -339,6 +375,9 @@ def init_handlers(application):
         },
         fallbacks=[
             MessageHandler(filters.Regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
+                           block=False),
+            MessageHandler(filters.Regex(pattern=re.compile(r'[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
+                           got_group_handler,
                            block=False),
             MessageHandler(filters.TEXT & ~filters.COMMAND, got_name_handler, block=False),
         ],
