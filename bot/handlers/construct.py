@@ -1,4 +1,3 @@
-import requests
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 import bot.ImportantDays as ImportantDays
 import datetime as datetime
@@ -8,7 +7,7 @@ import bot.formats.decode as decode
 from bot.schedule.week import get_current_week_number
 
 
-def construct_teacher_workdays(week: int, schedule: list, room, day=None):
+def construct_teacher_workdays(week: int, schedule: list, room=None, group=None, day=None):
     """
     Создает Inline клавиатуру с днями недели, когда у преподавателя есть пары.
     В случае если у преподавателя есть пары, то колбэк кнопки равен дню недели
@@ -16,16 +15,27 @@ def construct_teacher_workdays(week: int, schedule: list, room, day=None):
     @param week: Номер недели
     @param schedule: Расписание в JSON
     @param room: Название аудитории
+    @param group: Название группы
     @param day: Номер дня недели
     @return: InlineKeyboard со стилизованными кнопками
     """
-
     if room:
         founded_days = list(
-            {lesson['weekday'] for lesson in schedule if lesson['room']['name'] == room and week in lesson['weeks']})
+            {lesson['weekday'] for lesson in schedule if
+             lesson['room']['name'] == room and week in lesson['weeks']}
+        )
+
+    elif group:
+        founded_days = list(
+            {lesson['weekday'] for lesson in schedule['lessons'] if
+             week in lesson['weeks']}
+        )
+
     else:
         founded_days = list(
-            {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons'] if week in lesson['weeks']})
+            {lesson['weekday'] for teacher in schedule for lesson in teacher['lessons']
+             if week in lesson['weeks']}
+        )
 
     no_work_indicator = "🏖️"
     weekdays = {

@@ -36,7 +36,7 @@ def format_outputs(parsed_schedule, context):
         teachers = ", ".join(decode.decode_teachers(
             [context.user_data["teacher"]]))
 
-    elif context.user_data["state"] == "get_room":
+    else:
         teacher_lists = [schedule.get("teachers", []) for schedule in parsed_schedule]
         teacher_names = {teacher.get("name", "") for teacher in itertools.chain(*teacher_lists)}
 
@@ -60,8 +60,7 @@ def format_outputs(parsed_schedule, context):
 
             weekday = WEEKDAYS[schedule["weekday"]]
 
-            if context.user_data["state"] == "get_room":
-                groups = ""
+            if context.user_data["state"] != "get_name":
                 if schedule["teachers"]:
                     for teacher in schedule["teachers"]:
                         if teacher["name"]:
@@ -71,8 +70,7 @@ def format_outputs(parsed_schedule, context):
                 else:
                     teachers = ""
 
-            else:
-                groups = schedule["group"]["name"]
+            groups = schedule["group"]["name"] if schedule["group"] and schedule["group"]["name"] else ""
 
             time_start = datetime.strptime(
                 schedule['calls']['time_start'],
@@ -101,29 +99,42 @@ def format_outputs(parsed_schedule, context):
 
         except Exception as e:
             if context.user_data["state"] == "get_room":
-                pass
+                target_info = {
+                    "type": "error",
+                    "room": context.user_data['room'],
+                    "week": context.user_data['week']
+
+                }
+            elif context.user_data["state"] == "get_name":
+
+                target_info = {
+                    "type": "error",
+                    "teacher": context.user_data['teacher'],
+                    "week": context.user_data['week']
+
+                }
+            elif context.user_data["state"] == "get_group":
+
+                target_info = {
+                    "type": "error",
+                    "group": context.user_data['group'],
+                    "week": context.user_data['week']
+
+                }
+
             else:
+                target_info = {
+                    "type": "error",
+                }
 
-                if str(e) == error_message:
-                    logger.lazy_logger.error(json.dumps(
-                        {"type": "error",
-                         "teacher": context.user_data['teacher'],
-                         "week": context.user_data['week'],
-                         }, ensure_ascii=False))
+            if str(e) != error_message:
+                error_message = str(e)
+                logger.lazy_logger.error(json.dumps(target_info, ensure_ascii=False))
+                text = "Ошибка при получении расписания, сообщите об этом в техподдержку @mirea_help_bot"
+                blocks.append(text)
+                text = ""
 
-                else:
-                    error_message = str(e)
-                    logger.lazy_logger.error(json.dumps(
-                        {"type": "error",
-                         "teacher": context.user_data['teacher'],
-                         "week": context.user_data['week'],
-                         }, ensure_ascii=False))
-                    text += "Ошибка при получении расписания, сообщите об этом в техподдержку " \
-                            "@mirea_help_bot"
-                    blocks.append(text)
-                    text = ""
-
-                    return blocks
+            return blocks
 
     return blocks
 
@@ -175,10 +186,43 @@ def check_same_surnames(teacher_schedule, surname):
     return surnames
 
 
-def parse(teacher_schedule, weekday, week_number, teacher, context, room):
+def parse(teacher_schedule, weekday, week_number, context, teacher=None, room=None, group=None):
     if room:
         context.user_data["room"] = room
         filtered_schedule = teacher_schedule
+
+        filtered_schedule = sorted(
+            filtered_schedule,
+            key=lambda lesson: (
+                lesson['weekday'],
+                lesson['calls']['num'],
+                lesson['discipline']['name']
+            ),
+            reverse=False
+        )
+
+        if weekday != -1:
+            filtered_schedule = list(
+                filter(
+                    lambda lesson: lesson['weekday'] == int(weekday),
+                    filtered_schedule
+                )
+            )
+
+        filtered_schedule = list(
+            filter(
+                lambda lesson: int(week_number) in lesson['weeks'],
+                filtered_schedule
+            )
+        )
+
+        return filtered_schedule
+
+    elif group:
+
+        context.user_data["group"] = group
+
+        filtered_schedule = teacher_schedule["lessons"]
 
         filtered_schedule = sorted(
             filtered_schedule,
@@ -262,13 +306,13 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule, context):
 def merge_weeks_numbers(teacher_schedule):
     for i in range(len(teacher_schedule)):
         if teacher_schedule[i]['weeks'] == list(range(1, 18)):
-            teacher_schedule[i]['weeks'] = "все"
+            teacher_schedule[i]['weeks'] = "Все"
 
         elif teacher_schedule[i]['weeks'] == list(range(2, 19, 2)):
-            teacher_schedule[i]['weeks'] = "по чётным"
+            teacher_schedule[i]['weeks'] = "По чётным"
 
         elif teacher_schedule[i]['weeks'] == list(range(1, 18, 2)):
-            teacher_schedule[i]['weeks'] = "по нечётным"
+            teacher_schedule[i]['weeks'] = "По нечётным"
 
         else:
             teacher_schedule[i]['weeks'] = ", ".join(
