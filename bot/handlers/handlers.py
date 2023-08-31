@@ -372,7 +372,7 @@ def init_handlers(application):
         entry_points=[
             MessageHandler(filters.Regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
                            block=False),
-            MessageHandler(filters.Regex(pattern=re.compile(r'[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
+            MessageHandler(filters.Regex(pattern=re.compile(r'^[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
                            got_group_handler,
                            block=False),
             MessageHandler(filters.TEXT & ~filters.COMMAND, got_name_handler, block=False),
@@ -386,7 +386,7 @@ def init_handlers(application):
         fallbacks=[
             MessageHandler(filters.Regex(pattern=re.compile(r'ауд (.+)', re.IGNORECASE)), got_room_handler,
                            block=False),
-            MessageHandler(filters.Regex(pattern=re.compile(r'[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
+            MessageHandler(filters.Regex(pattern=re.compile(r'^[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE)),
                            got_group_handler,
                            block=False),
             MessageHandler(filters.TEXT & ~filters.COMMAND, got_name_handler, block=False),
