@@ -61,7 +61,6 @@ def format_outputs(parsed_schedule, context):
             weekday = WEEKDAYS[schedule["weekday"]]
 
             if context.user_data["state"] == "get_room":
-                groups = ""
                 if schedule["teachers"]:
                     for teacher in schedule["teachers"]:
                         if teacher["name"]:
@@ -71,8 +70,7 @@ def format_outputs(parsed_schedule, context):
                 else:
                     teachers = ""
 
-            else:
-                groups = schedule["group"]["name"]
+            groups = schedule["group"]["name"] if schedule["group"] and schedule["group"]["name"] else ""
 
             time_start = datetime.strptime(
                 schedule['calls']['time_start'],
@@ -101,29 +99,28 @@ def format_outputs(parsed_schedule, context):
 
         except Exception as e:
             if context.user_data["state"] == "get_room":
-                pass
+                target_info = {
+                    "type": "error",
+                    "room": context.user_data['room'],
+                    "week": context.user_data['week']
+
+                }
             else:
 
-                if str(e) == error_message:
-                    logger.lazy_logger.error(json.dumps(
-                        {"type": "error",
-                         "teacher": context.user_data['teacher'],
-                         "week": context.user_data['week'],
-                         }, ensure_ascii=False))
+                target_info = {
+                    "type": "error",
+                    "teacher": context.user_data['teacher'],
+                    "week": context.user_data['week']
 
-                else:
-                    error_message = str(e)
-                    logger.lazy_logger.error(json.dumps(
-                        {"type": "error",
-                         "teacher": context.user_data['teacher'],
-                         "week": context.user_data['week'],
-                         }, ensure_ascii=False))
-                    text += "Ошибка при получении расписания, сообщите об этом в техподдержку " \
-                            "@mirea_help_bot"
-                    blocks.append(text)
-                    text = ""
+                }
+            if str(e) != error_message:
+                error_message = str(e)
+                logger.lazy_logger.error(json.dumps(target_info, ensure_ascii=False))
+                text = "Ошибка при получении расписания, сообщите об этом в техподдержку @mirea_help_bot"
+                blocks.append(text)
+                text = ""
 
-                    return blocks
+            return blocks
 
     return blocks
 
