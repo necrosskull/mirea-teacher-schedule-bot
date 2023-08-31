@@ -259,13 +259,13 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule, context):
 def merge_weeks_numbers(teacher_schedule):
     for i in range(len(teacher_schedule)):
         if teacher_schedule[i]['weeks'] == list(range(1, 18)):
-            teacher_schedule[i]['weeks'] = "все"
+            teacher_schedule[i]['weeks'] = "Все"
 
         elif teacher_schedule[i]['weeks'] == list(range(2, 19, 2)):
-            teacher_schedule[i]['weeks'] = "по чётным"
+            teacher_schedule[i]['weeks'] = "По чётным"
 
         elif teacher_schedule[i]['weeks'] == list(range(1, 18, 2)):
-            teacher_schedule[i]['weeks'] = "по нечётным"
+            teacher_schedule[i]['weeks'] = "По нечётным"
 
         else:
             teacher_schedule[i]['weeks'] = ", ".join(
