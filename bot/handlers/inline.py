@@ -1,4 +1,5 @@
 import json
+import re
 
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import CallbackContext, InlineQueryHandler, ChosenInlineResultHandler, CallbackQueryHandler
@@ -68,6 +69,37 @@ async def inlinequery(update: Update, context: CallbackContext):
 
         await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
+    elif re.match(re.compile(r'[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE), update.inline_query.query):
+        context.user_data["state"] = "get_group"
+        query = update.inline_query.query.upper()
+
+        if not query:
+            return
+
+        logger.lazy_logger.info(json.dumps(
+            {"type": "query",
+             "queryId": update.inline_query.id,
+             "query": query.lower(),
+             **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
+
+        group_schedule = fetch.fetch_schedule_by_group(query)
+
+        if group_schedule is None:
+            return
+
+        inline_results = [InlineQueryResultArticle(
+            id=query,
+            title=query,
+            description="Нажми, чтобы посмотреть расписание",
+            input_message_content=InputTextMessageContent(
+                message_text=f"Выбрана группа: {query}!\n" +
+                             f"Выберите неделю:"
+            ),
+            reply_markup=construct.construct_weeks_markup(),
+        )]
+
+        await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
+
     else:
         context.user_data["state"] = "get_name"
         query = update.inline_query.query
@@ -133,8 +165,12 @@ async def answer_inline_handler(update: Update, context: CallbackContext):
     и выставляет текущий шаг Inline запроса на ask_day
     """
     if update.chosen_inline_result is not None:
-        if context.user_data["state"] != "get_room":
+        if context.user_data["state"] == "get_name":
             context.user_data["teacher"] = update.chosen_inline_result.result_id
+
+        elif context.user_data["state"] == "get_group":
+            context.user_data["group"] = update.chosen_inline_result.result_id
+
         else:
             context.user_data["room_id"] = update.chosen_inline_result.result_id
             for room in context.user_data['available_rooms']:
@@ -171,8 +207,13 @@ async def inline_dispatcher(update: Update, context: CallbackContext):
     if status == InlineStep.EInlineStep.ask_week:
         context.user_data['available_teachers'] = None
         context.user_data['available_rooms'] = None
+
         if context.user_data["state"] == "get_room":
             context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(context.user_data["room_id"])
+
+        elif context.user_data["state"] == "get_group":
+            context.user_data["schedule"] = fetch.fetch_schedule_by_group(context.user_data["group"])
+
         else:
             context.user_data["schedule"] = fetch.fetch_schedule_by_name(
                 context.user_data["teacher"])
@@ -188,8 +229,13 @@ async def inline_dispatcher(update: Update, context: CallbackContext):
     if status == InlineStep.EInlineStep.ask_day:
         target = await handlers.got_day_handler(update, context)
         if target == GETWEEK:
+
             if context.user_data["state"] == "get_room":
                 context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(context.user_data["room_id"])
+
+            elif context.user_data["state"] == "get_group":
+                context.user_data["schedule"] = fetch.fetch_schedule_by_group(context.user_data["group"])
+                
             else:
                 context.user_data["schedule"] = fetch.fetch_schedule_by_name(
                     context.user_data["teacher"])

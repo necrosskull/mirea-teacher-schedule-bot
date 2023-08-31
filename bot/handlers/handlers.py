@@ -278,6 +278,11 @@ async def got_room_handler(update: Update, context: CallbackContext):
     @param context: CallbackContext of API
     @return: Int код шага
     """
+    if update.message and update.message.via_bot:
+        return
+    elif update.edited_message and update.edited_message.via_bot:
+        return
+
     insert_new_user(update, context)
 
     if context.bot_data["maintenance_mode"]:
@@ -323,6 +328,11 @@ async def got_room_handler(update: Update, context: CallbackContext):
 
 
 async def got_group_handler(update: Update, context: CallbackContext):
+    if update.message and update.message.via_bot:
+        return
+    elif update.edited_message and update.edited_message.via_bot:
+        return
+
     insert_new_user(update, context)
 
     if context.bot_data["maintenance_mode"]:
