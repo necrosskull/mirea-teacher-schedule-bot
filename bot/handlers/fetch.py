@@ -13,7 +13,7 @@ def fetch_schedule_by_name(teacher_name):
     url = f"{api_url}/api/teachers/search/{teacher_name}"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         return response.json() if response.status_code == 200 else None
 
     except requests.RequestException:
@@ -30,7 +30,7 @@ def fetch_room_id_by_name(room_name):
     url = f"{api_url}/api/rooms/search/{room_name}"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if len(data) > 0:
@@ -56,7 +56,7 @@ def fetch_room_schedule_by_id(room_id):
     url = f"{api_url}/api/lessons/rooms/{room_id}"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if len(data) > 0:
@@ -82,7 +82,7 @@ def fetch_schedule_by_group(group_name):
     url = f"{api_url}/api/groups/name/{group_name}"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if len(data) > 0:
