@@ -328,4 +328,6 @@ def check_same_rooms(room_schedule, room):
             class_info = f"{rooms['name']}:{rooms['id']}"
             classes.append(class_info)
 
+    classes = list(sorted(classes, key=lambda x: x.split(":")[0]))
+
     return classes
