@@ -289,9 +289,8 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule, context):
                     teacher_schedule[i]['weeks'] == teacher_schedule[j]['weeks'] and
                     teacher_schedule[i]['weekday'] == teacher_schedule[j]['weekday']
             ):
-                if context.user_data["state"] != "get_room":
-                    teacher_schedule[i]["group"]["name"] += ", " + \
-                                                            teacher_schedule[j]["group"]["name"]
+                teacher_schedule[i]["group"]["name"] += ", " + \
+                                                        teacher_schedule[j]["group"]["name"]
 
                 remove_index.append(j)
 
