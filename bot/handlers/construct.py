@@ -52,6 +52,7 @@ def construct_teacher_workdays(week: int, schedule: list, room=None, group=None,
 
     for i in range(1, 7):
         sign = ""
+        sign1 = ""
         callback = i
 
         if i not in founded_days:
@@ -59,11 +60,12 @@ def construct_teacher_workdays(week: int, schedule: list, room=None, group=None,
             callback = "chill"
 
         if day and i == day:
-            sign = "●"
+            sign = "◖"
+            sign1 = "◗"
 
         row.append(
             InlineKeyboardButton(
-                text=f"{sign}{weekdays[i]}{sign}",
+                text=f"{sign}{weekdays[i]}{sign1 if sign1 else sign}",
                 callback_data=callback
             ))
 
@@ -122,19 +124,21 @@ def construct_weeks_markup():
     если текущий день соответствует некоторой памятной дате+-интервал
     """
     current_week = get_current_week_number()
-    week_indicator = "●"
+    week_indicator = "◖"
+    week_indicator1 = "◗"
     today = datetime.date.today()
 
     for day in ImportantDays.important_days:
         if abs((day[ImportantDays.DATE] -
                 today).days) <= day[ImportantDays.INTERVAL]:
             week_indicator = day[ImportantDays.SIGN]
+            week_indicator1 = day[ImportantDays.SIGN]
 
     week_buttons = []
     row_buttons = []
 
     for i in range(1, 18):
-        button_text = f"{week_indicator}{i}{week_indicator}" if i == current_week else str(i)
+        button_text = f"{week_indicator}{i}{week_indicator1}" if i == current_week else str(i)
         row_buttons.append(InlineKeyboardButton(
             text=button_text,
             callback_data=i
