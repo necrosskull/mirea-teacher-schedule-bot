@@ -247,6 +247,9 @@ async def telegram_delivery_optimisation(
         context: CallbackContext, selected_day):
     week = context.user_data["week"]
 
+    if not selected_day:
+        selected_day = context.user_data.get("day", None)
+        
     if context.user_data["state"] == "get_room":
         room = context.user_data["room"]
         room_id = context.user_data["room_id"]
@@ -259,7 +262,7 @@ async def telegram_delivery_optimisation(
         context.user_data["schedule"] = fetch.fetch_schedule_by_group(group)
         schedule = context.user_data["schedule"]
         teacher_workdays = construct.construct_teacher_workdays(week, schedule, group=group, day=selected_day)
-        
+
     else:
 
         context.user_data["schedule"] = fetch.fetch_schedule_by_name(
