@@ -190,7 +190,7 @@ async def inline_dispatcher(update: Update, context: CallbackContext):
     if "inline_step" not in context.user_data:
         await deny_inline_usage(update)
         return
-    print(context.user_data["inline_step"])
+
     # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
     # меню, то отказываем в обработке
 
@@ -230,7 +230,7 @@ async def inline_dispatcher(update: Update, context: CallbackContext):
         if target == GETWEEK:  # Если пользователь вернулся назад на выбор недели, то мы переходим на этап выбора недели
             context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
 
-        return
+    return
 
 
 async def deny_inline_usage(update: Update):
