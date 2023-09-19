@@ -292,6 +292,12 @@ async def got_room_handler(update: Update, context: CallbackContext):
     context.user_data["state"] = "get_room"
     room = update.message.text[4:].lower()
 
+    if len(room) < 3:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Слишком короткий запрос\nПопробуйте еще раз")
+        return
+
     logger.lazy_logger.info(json.dumps({"type": "request",
                                         "query": update.message.text.lower(),
                                         **update.message.from_user.to_dict()},
