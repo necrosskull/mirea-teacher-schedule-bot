@@ -18,7 +18,7 @@ import bot.lazy_logger as logger
 from bot.db.database import insert_new_user
 from bot.schedule.week import get_current_week_number
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, GETROOM, ROOM_CLARIFY = range(6)
 
 
 async def got_name_handler(update: Update, context: CallbackContext):
