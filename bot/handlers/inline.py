@@ -24,6 +24,15 @@ async def handle_inline_query(update: Update, context: CallbackContext):
     if context.bot_data["maintenance_mode"]:
         return
 
+    if len(update.inline_query.query) < 2:
+        return
+
+    logger.lazy_logger.info(json.dumps(
+        {"type": "query",
+         "queryId": update.inline_query.id,
+         "query": update.inline_query.query.lower(),
+         **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
+
     inline_query = update.inline_query
     query = inline_query.query.lower()
 
@@ -43,12 +52,6 @@ async def handle_room_query(update: Update, context: CallbackContext, query: str
     query = query[4:].lower()
     if not query or len(query) < 3:
         return
-
-    logger.lazy_logger.info(json.dumps(
-        {"type": "query",
-         "queryId": update.inline_query.id,
-         "query": query,
-         **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
 
     room_schedule = fetch.fetch_room_id_by_name(query)
 
@@ -86,12 +89,6 @@ async def handle_group_query(update: Update, context: CallbackContext, query: st
     query = query.upper()
     if not query:
         return
-
-    logger.lazy_logger.info(json.dumps(
-        {"type": "query",
-         "queryId": update.inline_query.id,
-         "query": query.lower(),
-         **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
 
     group_schedule = fetch.fetch_schedule_by_group(query)
 
@@ -180,7 +177,7 @@ async def answer_inline_handler(update: Update, context: CallbackContext):
 
         context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
         context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
-        return
+    return
 
 
 async def inline_dispatcher(update: Update, context: CallbackContext):
