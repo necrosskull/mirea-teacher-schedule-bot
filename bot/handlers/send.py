@@ -6,7 +6,7 @@ import bot.formats.formatting as formatting
 import bot.handlers.construct as construct
 import bot.handlers.fetch as fetch
 
-GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, BACK, GETROOM, ROOM_CLARIFY = range(7)
+GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, GETROOM, ROOM_CLARIFY = range(6)
 
 
 async def send_week_selector(
