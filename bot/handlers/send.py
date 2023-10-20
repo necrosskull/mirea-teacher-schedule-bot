@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InputMediaPhoto, InlineKeyboardButton
 from telegram.ext import CallbackContext
 
 import bot.formats.decode as decode
@@ -58,22 +58,22 @@ async def send_week_selector(
 
         return GETWEEK
 
-    teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
-
+    schedule = context.user_data["schedule"]
+    img_link = schedule["data"][0]["scheduleImageLink"]
     if firsttime:
-        await context.bot.send_message(
+
+        await context.bot.send_photo(
             chat_id=update.effective_chat.id,
-            text=f"Выбран преподаватель: {teacher}\n" +
-                 f"Выберите неделю:",
-            reply_markup=construct.construct_weeks_markup()
+            photo=img_link,
         )
 
     else:
-        await update.callback_query.edit_message_text(
-            text=f"Выбран преподаватель: {teacher}\n" +
-                 f"Выберите неделю:",
-            reply_markup=construct.construct_weeks_markup()
+        await context.bot.send_photo(
+            chat_id=update.effective_chat.id,
+            photo=img_link,
+            reply_markup=(construct.construct_back_markup())
         )
+        await update.callback_query.delete_message()
 
     return GETWEEK
 
@@ -108,10 +108,12 @@ async def send_teacher_clarity(
         )
 
     else:
-        await update.callback_query.edit_message_text(
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
             text="Выберите преподавателя:",
             reply_markup=few_teachers_markup
         )
+        await update.callback_query.delete_message()
 
     return TEACHER_CLARIFY
 
@@ -249,7 +251,7 @@ async def telegram_delivery_optimisation(
 
     if not selected_day:
         selected_day = context.user_data.get("day", None)
-        
+
     if context.user_data["state"] == "get_room":
         room = context.user_data["room"]
         room_id = context.user_data["room_id"]

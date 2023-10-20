@@ -1,4 +1,4 @@
-FROM python:3.11.4-slim-bullseye AS python
+FROM python:3.12-slim-bullseye AS python
 
 # Poetry configuration
 ENV POETRY_HOME="/opt/poetry" \

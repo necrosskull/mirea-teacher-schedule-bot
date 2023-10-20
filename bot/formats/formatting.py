@@ -175,12 +175,9 @@ def check_same_surnames(teacher_schedule, surname):
     :return: surnames - лист ФИО преподавателей
     """
     surnames = []
-    for teacher in teacher_schedule:
-        if surname in teacher['name']:
-            if teacher['name'][-1] != ".":
-                teacher['name'] += "."
-
-            surnames.append(teacher['name'])
+    for teacher in teacher_schedule['data']:
+        if surname in teacher['fullTitle']:
+            surnames.append(teacher['fullTitle'])
             surnames = list(set(surnames))
 
     return surnames

@@ -10,7 +10,7 @@ def fetch_schedule_by_name(teacher_name):
     @return: JSON расписание или None если преподаватель не найден
     """
 
-    url = f"{api_url}/api/teachers/search/{teacher_name}"
+    url = f"https://schedule-of.mirea.ru/schedule/api/search?limit=15&match={teacher_name}"
 
     try:
         response = requests.get(url, timeout=5)

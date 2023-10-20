@@ -118,6 +118,16 @@ def construct_rooms_markup(rooms):
     return ROOM_CLARIFY_MARKUP
 
 
+def construct_back_markup():
+    """
+    Конструирует клавиатуру назад
+    """
+    btns = [[(InlineKeyboardButton("Назад", callback_data="back"))]]
+    BACK_MARKUP = InlineKeyboardMarkup(btns)
+
+    return BACK_MARKUP
+
+
 def construct_weeks_markup():
     """
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи

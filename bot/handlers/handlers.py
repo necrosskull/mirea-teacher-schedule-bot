@@ -179,7 +179,6 @@ async def got_week_handler(update: Update, context: CallbackContext) -> Any | No
         else:
 
             if context.user_data['available_teachers'] is not None:
-
                 return await send.send_teacher_clarity(update, context)
 
             else:
