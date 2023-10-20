@@ -144,13 +144,12 @@ async def handle_teacher_query(update: Update, context: CallbackContext, query: 
     for surname, decoded_surname in zip(surnames, decoded_surnames):
         inline_results.append(InlineQueryResultArticle(
             id=surname,
-            title=decoded_surname,
+            title='Инлайн режим не работает по причине вика',
             description="Нажми, чтобы посмотреть расписание",
             input_message_content=InputTextMessageContent(
                 message_text=f"Выбран преподаватель: {decoded_surname}!\n" +
-                             f"Выберите неделю:"
-            ),
-            reply_markup=construct.construct_weeks_markup(),
+                             f"Ничего не выбирайте, вика же так не умеет\nИспользуйте обычное сообщение"
+            )
         ))
 
     await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
