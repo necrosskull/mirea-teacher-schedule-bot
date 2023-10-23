@@ -177,6 +177,8 @@ async def answer_inline_handler(update: Update, context: CallbackContext):
 
         context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
         context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
+        context.user_data["message_id"] = update.chosen_inline_result.inline_message_id
+
     return
 
 

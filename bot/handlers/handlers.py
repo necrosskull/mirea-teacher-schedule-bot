@@ -102,6 +102,9 @@ async def got_teacher_clarification_handler(
     """
     query = update.callback_query
 
+    if await deny_old_message(update, context, query=query):
+        return
+
     chosed_teacher = update.callback_query.data
 
     if chosed_teacher == "back":
@@ -131,6 +134,9 @@ async def got_room_clarification_handler(
     @return: Int код шага
     """
     query = update.callback_query
+
+    if await deny_old_message(update, context, query=query):
+        return
 
     chosen_room = update.callback_query.data
     context.user_data['room_id'] = chosen_room
@@ -164,6 +170,9 @@ async def got_week_handler(update: Update, context: CallbackContext) -> Any | No
     @return: Int код шага
     """
     query = update.callback_query
+
+    if await deny_old_message(update, context, query=query):
+        return
 
     selected_button = update.callback_query.data
 
@@ -233,6 +242,9 @@ async def got_day_handler(update: Update, context: CallbackContext):
     @return: Int код шага
     """
     query = update.callback_query
+
+    if await deny_old_message(update, context, query=query):
+        return
 
     selected_button = update.callback_query.data
 
@@ -366,6 +378,21 @@ async def got_group_handler(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text(
             "Группа не найдена, попробуйте еще раз")
+
+
+async def deny_old_message(update: Update, context: CallbackContext, query=None):
+    message_id = None
+    
+    if query.inline_message_id:
+        message_id = query.inline_message_id
+    if query.message:
+        message_id = query.message.message_id
+
+    if context.user_data['message_id'] != message_id:
+        await query.answer(
+            text="Это сообщение не относится к вашему текущему запросу, повторите ваш запрос!",
+            show_alert=True)
+        return True
 
 
 async def maintenance_message(update: Update, context: CallbackContext):
