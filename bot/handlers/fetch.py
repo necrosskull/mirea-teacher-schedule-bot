@@ -14,9 +14,11 @@ def fetch_schedule_by_name(teacher_name):
 
     try:
         response = requests.get(url, timeout=5)
+        print(response.status_code)
         return response.json() if response.status_code == 200 else None
 
-    except requests.RequestException:
+    except requests.RequestException as err:
+        print(err)
         return None
 
 
@@ -42,7 +44,8 @@ def fetch_room_id_by_name(room_name):
         else:
             return None
 
-    except requests.RequestException:
+    except requests.RequestException as err:
+        print(err)
         return None
 
 
@@ -68,7 +71,8 @@ def fetch_room_schedule_by_id(room_id):
         else:
             return None
 
-    except requests.RequestException:
+    except requests.RequestException as err:
+        print(err)
         return None
 
 
@@ -94,5 +98,6 @@ def fetch_schedule_by_group(group_name):
         else:
             return None
 
-    except requests.RequestException:
+    except requests.RequestException as err:
+        print(err)
         return None
