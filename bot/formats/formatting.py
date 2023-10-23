@@ -166,6 +166,20 @@ def normalize_teachername(raw_teacher_name: str):
     return teacher
 
 
+def check_letters(teacher):
+    """
+    Проверяет наличие букв е или ё в фамилии
+    @param teacher: Фамилия
+    @return: измененная фамилия
+    """
+    if "ё" in teacher:
+        teacher = teacher.replace("ё", "е")
+    elif "е" in teacher:
+        teacher = teacher.replace("е", "ё")
+
+    return teacher
+
+
 def check_same_surnames(teacher_schedule, surname):
     """
     Проверяет имеющихся в JSON преподавателей.
