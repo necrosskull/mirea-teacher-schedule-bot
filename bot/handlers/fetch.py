@@ -14,7 +14,6 @@ def fetch_schedule_by_name(teacher_name):
 
     try:
         response = requests.get(url, timeout=5)
-        print(response.status_code)
         return response.json() if response.status_code == 200 else None
 
     except requests.RequestException as err:
