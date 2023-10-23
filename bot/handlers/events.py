@@ -14,17 +14,20 @@ async def toggle_maintenance_mode(update: Update, context: CallbackContext):
     if update.message.from_user.id not in config.ADMINS:
         return
 
+    maintenance_message = " ".join(context.args) if context.args else None
+    context.bot_data["maintenance_message"] = maintenance_message
+
     if context.bot_data["maintenance_mode"]:
         context.bot_data["maintenance_mode"] = False
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Режим обслуживания отключен",
+            text="❌ Режим обслуживания отключен",
         )
     else:
         context.bot_data["maintenance_mode"] = True
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Режим обслуживания включен",
+            text="✅ Режим обслуживания включен",
         )
 
 

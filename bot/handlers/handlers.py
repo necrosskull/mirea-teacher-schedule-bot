@@ -375,9 +375,14 @@ async def got_group_handler(update: Update, context: CallbackContext):
 
 
 async def maintenance_message(update: Update, context: CallbackContext):
+    maintenance_text = context.bot_data["maintenance_message"] if context.bot_data["maintenance_message"] else None
+
+    text = f"{maintenance_text}" if maintenance_text else \
+        "Бот находится на техническом обслуживании, скоро всё заработает!"
+
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Бот находится на техническом обслуживании, скоро всё заработает!",
+        text=text,
     )
 
 
