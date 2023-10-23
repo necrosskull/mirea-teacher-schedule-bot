@@ -56,13 +56,17 @@ async def got_name_handler(update: Update, context: CallbackContext):
 
     teacher_schedule = fetch.fetch_schedule_by_name(teacher)
 
+    modified_name = None
+
     if not teacher_schedule:
         modified_name = formatting.replace_letters_in_teacher_name(teacher)
         teacher_schedule = fetch.fetch_schedule_by_name(modified_name)
 
     if teacher_schedule:
         context.user_data["schedule"] = teacher_schedule
-        available_teachers = formatting.check_same_surnames(teacher_schedule, teacher)
+
+        fixed_teacher = modified_name if modified_name else teacher
+        available_teachers = formatting.check_same_surnames(teacher_schedule, fixed_teacher)
 
         if len(available_teachers) > 1:
             context.user_data["available_teachers"] = available_teachers
