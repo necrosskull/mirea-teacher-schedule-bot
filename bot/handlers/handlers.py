@@ -47,10 +47,11 @@ async def got_name_handler(update: Update, context: CallbackContext):
                                         **update.message.from_user.to_dict()},
                                        ensure_ascii=False))
 
-    if len(inputted_teacher) < 2:
+    if len(inputted_teacher) < 3:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Слишком короткий запрос\nПопробуйте еще раз")
+            text="❌ Слишком короткий запрос\nПопробуйте еще раз")
+        return
 
     teacher = formatting.normalize_teachername(inputted_teacher)
 
