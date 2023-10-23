@@ -145,7 +145,7 @@ def normalize_teachername(raw_teacher_name: str):
     @param raw_teacher_name: Ввод пользователя
     @return: Фамилия начинаяющая с большой буквы и с пробелом в конце
     """
-    teacher = raw_teacher_name.title()
+    teacher = raw_teacher_name.title().replace('ё', 'е')
     name_parts = teacher.split()
 
     if len(name_parts) > 1:
@@ -166,31 +166,17 @@ def normalize_teachername(raw_teacher_name: str):
     return teacher
 
 
-def check_letters(teacher):
-    """
-    Проверяет наличие букв е или ё в фамилии
-    @param teacher: Фамилия
-    @return: измененная фамилия
-    """
-    if "ё" in teacher:
-        teacher = teacher.replace("ё", "е")
-    elif "е" in teacher:
-        teacher = teacher.replace("е", "ё")
-
-    return teacher
-
-
 def check_same_surnames(teacher_schedule, surname):
     """
     Проверяет имеющихся в JSON преподавателей.
-    В случае нахождения однофамильца, но сдругим именем или фамилией заносит в список surnames
+    В случае нахождения однофамильца, но с другим именем или фамилией заносит в список surnames
     :param teacher_schedule: JSON строка расписания
     :param surname: Строка фильтрации, например фамилия
     :return: surnames - лист ФИО преподавателей
     """
     surnames = []
     for teacher in teacher_schedule:
-        if surname in teacher['name']:
+        if surname in teacher['name'].replace('ё', 'е'):
             if teacher['name'][-1] != ".":
                 teacher['name'] += "."
 

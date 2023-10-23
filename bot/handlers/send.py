@@ -18,60 +18,39 @@ async def send_week_selector(
     нового сообщения @param update: Update class of API @param context: CallbackContext of API @param firsttime:
     Впервые ли производится общение с пользователем @return: Статус следующего шага - GETWEEK
     """
-    if context.user_data["state"] == "get_room":
+    state = context.user_data["state"]
+
+    room = None
+    group = None
+    teacher = None
+
+    if state == "get_room":
         room = context.user_data["room"]
-
-        if firsttime:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Выбрана аудитория: {room}\n" +
-                     f"Выберите неделю:",
-                reply_markup=construct.construct_weeks_markup()
-            )
-
-        else:
-            await update.callback_query.edit_message_text(
-                text=f"Выбрана аудитория: {room}\n" +
-                     f"Выберите неделю:",
-                reply_markup=construct.construct_weeks_markup()
-            )
-
-        return GETWEEK
-
-    if context.user_data["state"] == "get_group":
+    elif state == "get_group":
         group = context.user_data["group"]
+    else:
+        teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
 
-        if firsttime:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Выбрана группа: {group}\n" +
-                     f"Выберите неделю:",
-                reply_markup=construct.construct_weeks_markup()
-            )
+    if state == "get_room":
+        text = f"Выбрана аудитория: {room}\n"
+    elif state == "get_group":
+        text = f"Выбрана группа: {group}\n"
+    else:
+        text = f"Выбран преподаватель: {teacher}\n"
 
-        else:
-            await update.callback_query.edit_message_text(
-                text=f"Выбрана группа: {group}\n" +
-                     f"Выберите неделю:",
-                reply_markup=construct.construct_weeks_markup()
-            )
-
-        return GETWEEK
-
-    teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
+    text += "Выберите неделю:"
 
     if firsttime:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"Выбран преподаватель: {teacher}\n" +
-                 f"Выберите неделю:",
+            text=text,
             reply_markup=construct.construct_weeks_markup()
         )
+        context.user_data["message_id"] = message.message_id
 
     else:
         await update.callback_query.edit_message_text(
-            text=f"Выбран преподаватель: {teacher}\n" +
-                 f"Выберите неделю:",
+            text=text,
             reply_markup=construct.construct_weeks_markup()
         )
 
@@ -101,11 +80,12 @@ async def send_teacher_clarity(
     few_teachers_markup = construct.construct_teacher_markup(available_teachers)
 
     if firsttime:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите преподавателя:",
             reply_markup=few_teachers_markup
         )
+        context.user_data["message_id"] = message.message_id
 
     else:
         await update.callback_query.edit_message_text(
@@ -249,7 +229,7 @@ async def telegram_delivery_optimisation(
 
     if not selected_day:
         selected_day = context.user_data.get("day", None)
-        
+
     if context.user_data["state"] == "get_room":
         room = context.user_data["room"]
         room_id = context.user_data["room_id"]
@@ -300,10 +280,11 @@ async def telegram_delivery_optimisation(
                 chunk, reply_markup=teacher_workdays)
 
         else:
-            await context.bot.send_message(
+            message = await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=chunk,
                 reply_markup=teacher_workdays)
+            context.user_data["message_id"] = message.message_id
 
     return GETDAY
 
@@ -313,11 +294,12 @@ async def send_room_clarity(update, context, firsttime=False):
     few_rooms_markup = construct.construct_rooms_markup(available_rooms)
 
     if firsttime:
-        await context.bot.send_message(
+        message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите аудиторию",
             reply_markup=few_rooms_markup
         )
+        context.user_data["message_id"] = message.message_id
 
     else:
         await update.callback_query.edit_message_text(

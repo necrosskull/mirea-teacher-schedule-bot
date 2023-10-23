@@ -47,21 +47,19 @@ async def got_name_handler(update: Update, context: CallbackContext):
                                         **update.message.from_user.to_dict()},
                                        ensure_ascii=False))
 
-    if len(inputted_teacher) < 2:
+    if len(inputted_teacher) < 3:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Слишком короткий запрос\nПопробуйте еще раз")
+            text="❌ Слишком короткий запрос\nПопробуйте еще раз")
+        return
 
     teacher = formatting.normalize_teachername(inputted_teacher)
 
     teacher_schedule = fetch.fetch_schedule_by_name(teacher)
 
-    if not teacher_schedule:
-        teacher = formatting.check_letters(teacher)
-        teacher_schedule = fetch.fetch_schedule_by_name(teacher)
-
     if teacher_schedule:
         context.user_data["schedule"] = teacher_schedule
+
         available_teachers = formatting.check_same_surnames(teacher_schedule, teacher)
 
         if len(available_teachers) > 1:
@@ -104,6 +102,9 @@ async def got_teacher_clarification_handler(
     """
     query = update.callback_query
 
+    if await deny_old_message(update, context, query=query):
+        return
+
     chosed_teacher = update.callback_query.data
 
     if chosed_teacher == "back":
@@ -133,6 +134,9 @@ async def got_room_clarification_handler(
     @return: Int код шага
     """
     query = update.callback_query
+
+    if await deny_old_message(update, context, query=query):
+        return
 
     chosen_room = update.callback_query.data
     context.user_data['room_id'] = chosen_room
@@ -166,6 +170,9 @@ async def got_week_handler(update: Update, context: CallbackContext) -> Any | No
     @return: Int код шага
     """
     query = update.callback_query
+
+    if await deny_old_message(update, context, query=query):
+        return
 
     selected_button = update.callback_query.data
 
@@ -235,6 +242,9 @@ async def got_day_handler(update: Update, context: CallbackContext):
     @return: Int код шага
     """
     query = update.callback_query
+
+    if await deny_old_message(update, context, query=query):
+        return
 
     selected_button = update.callback_query.data
 
@@ -370,10 +380,30 @@ async def got_group_handler(update: Update, context: CallbackContext):
             "Группа не найдена, попробуйте еще раз")
 
 
+async def deny_old_message(update: Update, context: CallbackContext, query=None):
+    message_id = None
+    
+    if query.inline_message_id:
+        message_id = query.inline_message_id
+    if query.message:
+        message_id = query.message.message_id
+
+    if context.user_data['message_id'] != message_id:
+        await query.answer(
+            text="Это сообщение не относится к вашему текущему запросу, повторите ваш запрос!",
+            show_alert=True)
+        return True
+
+
 async def maintenance_message(update: Update, context: CallbackContext):
+    maintenance_text = context.bot_data["maintenance_message"] if context.bot_data["maintenance_message"] else None
+
+    text = f"{maintenance_text}" if maintenance_text else \
+        "Бот находится на техническом обслуживании, скоро всё заработает!"
+
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Бот находится на техническом обслуживании, скоро всё заработает!",
+        text=text,
     )
 
 
