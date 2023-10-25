@@ -31,6 +31,7 @@ def format_outputs(parsed_schedule, context):
     blocks = []
     zipped_teachers = []
     teachers = ""
+    week = context.user_data["week"]
 
     if context.user_data["state"] == "get_name":
         teachers = ", ".join(decode.decode_teachers(
@@ -86,12 +87,12 @@ def format_outputs(parsed_schedule, context):
 
             text += f'📝 Пара № {schedule["calls"]["num"]} в ⏰ {formatted_time}\n'
             text += f'📝 {schedule["discipline"]["name"]}\n'
+            text += f'📚 Тип: {lesson_type.capitalize()}\n'
             if len(groups) > 0:
                 text += f'👥 Группы: {groups}\n'
-            text += f'📚 Тип: {lesson_type}\n'
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
             text += f"🏫 Аудитории: {room}\n"
-            text += f'📅 Недели: {schedule["weeks"]}\n'
+            text += f'📅 Неделя: {week}\n'
             text += f"📆 День недели: {weekday}\n\n"
 
             blocks.append(text)
@@ -298,24 +299,6 @@ def remove_duplicates_merge_groups_with_same_lesson(teacher_schedule, context):
 
     for i in sorted(remove_index, reverse=True):
         del teacher_schedule[i]
-
-    return teacher_schedule
-
-
-def merge_weeks_numbers(teacher_schedule):
-    for i in range(len(teacher_schedule)):
-        if teacher_schedule[i]['weeks'] == list(range(1, 18)):
-            teacher_schedule[i]['weeks'] = "Все"
-
-        elif teacher_schedule[i]['weeks'] == list(range(2, 19, 2)):
-            teacher_schedule[i]['weeks'] = "По чётным"
-
-        elif teacher_schedule[i]['weeks'] == list(range(1, 18, 2)):
-            teacher_schedule[i]['weeks'] = "По нечётным"
-
-        else:
-            teacher_schedule[i]['weeks'] = ", ".join(
-                str(week) for week in teacher_schedule[i]['weeks'])
 
     return teacher_schedule
 

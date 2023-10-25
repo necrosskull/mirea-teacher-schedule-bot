@@ -209,8 +209,6 @@ async def send_result(update: Update, context: CallbackContext, selected_day):
     parsed_schedule = formatting.remove_duplicates_merge_groups_with_same_lesson(
         parsed_schedule, context)
 
-    parsed_schedule = formatting.merge_weeks_numbers(parsed_schedule)
-
     if len(parsed_schedule) == 0:
         await update.callback_query.answer(
             text="В этот день пар нет.", show_alert=True)
