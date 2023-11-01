@@ -109,9 +109,10 @@ def construct_rooms_markup(rooms):
     btns = []
 
     for room in rooms:
-        room_number, room_data = room.split(':')
+        room_number, room_data, campus = room.split(':')
+        room_text = f"{room_number} {campus}" if campus != "" else f"{room_number}"
         btns = btns + \
-               [[InlineKeyboardButton(room_number, callback_data=room_data)]]
+               [[InlineKeyboardButton(room_text, callback_data=room_data)]]
     btns = btns + [[(InlineKeyboardButton("Назад", callback_data="back"))]]
     ROOM_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
 

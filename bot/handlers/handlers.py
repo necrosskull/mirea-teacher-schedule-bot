@@ -142,9 +142,10 @@ async def got_room_clarification_handler(
     context.user_data['room_id'] = chosen_room
 
     for room in context.user_data['available_rooms']:
-        room_name, room_id = room.split(':')
+        room_name, room_id, campus = room.split(':')
         if room_id == chosen_room:
             context.user_data['room'] = room_name
+            context.user_data['campus'] = campus
 
     if chosen_room == "back":
         return await send.resend_name_input(update, context)
@@ -334,8 +335,9 @@ async def got_room_handler(update: Update, context: CallbackContext):
 
         else:
             context.user_data["available_rooms"] = None
-            room_name, room_id = available_rooms[0].split(':')
+            room_name, room_id, campus = available_rooms[0].split(':')
 
+            context.user_data["campus"] = campus
             context.user_data["room"] = room_name
             context.user_data["room_id"] = room_id
 
@@ -382,7 +384,7 @@ async def got_group_handler(update: Update, context: CallbackContext):
 
 async def deny_old_message(update: Update, context: CallbackContext, query=None):
     message_id = None
-    
+
     if query.inline_message_id:
         message_id = query.inline_message_id
     if query.message:

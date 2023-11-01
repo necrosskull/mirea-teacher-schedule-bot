@@ -307,7 +307,11 @@ def check_same_rooms(room_schedule, room):
     classes = []
     for rooms in room_schedule:
         if room in rooms['name'].lower():
-            class_info = f"{rooms['name']}:{rooms['id']}"
+            short_name = rooms['campus']['short_name'] if rooms['campus'] and rooms['campus']['short_name'] else ""
+            if short_name != "":
+                short_name = f"({short_name})"
+
+            class_info = f"{rooms['name']}:{rooms['id']}:{short_name}"
             classes.append(class_info)
 
     classes = list(sorted(classes, key=lambda x: x.split(":")[0]))

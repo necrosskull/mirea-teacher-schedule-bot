@@ -23,16 +23,18 @@ async def send_week_selector(
     room = None
     group = None
     teacher = None
+    campus = None
 
     if state == "get_room":
         room = context.user_data["room"]
+        campus = context.user_data["campus"]
     elif state == "get_group":
         group = context.user_data["group"]
     else:
         teacher = ", ".join(decode.decode_teachers([context.user_data["teacher"]]))
 
     if state == "get_room":
-        text = f"Выбрана аудитория: {room}\n"
+        text = f"Выбрана аудитория: {room} {campus}\n"
     elif state == "get_group":
         text = f"Выбрана группа: {group}\n"
     else:
@@ -108,12 +110,13 @@ async def send_day_selector(update: Update, context: CallbackContext):
 
     if context.user_data["state"] == "get_room":
         room = context.user_data["room"]
+        campus = context.user_data["campus"]
 
         if schedule:
             room_workdays = construct.construct_teacher_workdays(week, schedule, room=room)
 
             await update.callback_query.edit_message_text(
-                text=f"Выбрана аудитория: {room} \n" +
+                text=f"Выбрана аудитория: {room} {campus} \n" +
                      f"Выбрана неделя: {week} \n" +
                      f"Выберите день:",
 

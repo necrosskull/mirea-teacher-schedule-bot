@@ -68,13 +68,14 @@ async def handle_room_query(update: Update, context: CallbackContext, query: str
     inline_results = []
 
     for room in available_rooms[:10]:
-        room_name, room_id = room.split(":")
+        room_name, room_id, campus = room.split(":")
+        room_text = f"{room_name} {campus}"
         inline_results.append(InlineQueryResultArticle(
             id=room_id,
-            title=room_name,
+            title=room_text,
             description="Нажми, чтобы посмотреть расписание",
             input_message_content=InputTextMessageContent(
-                message_text=f"Выбрана аудитория: {room_name}!\n" +
+                message_text=f"Выбрана аудитория: {room_text}!\n" +
                              f"Выберите неделю:"
             ),
             reply_markup=construct.construct_weeks_markup(),
@@ -171,9 +172,10 @@ async def answer_inline_handler(update: Update, context: CallbackContext):
         else:
             context.user_data["room_id"] = update.chosen_inline_result.result_id
             for room in context.user_data['available_rooms']:
-                room_name, room_id = room.split(':')
+                room_name, room_id, campus = room.split(':')
                 if room_id == update.chosen_inline_result.result_id:
                     context.user_data['room'] = room_name
+                    context.user_data['campus'] = campus
 
         context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
         context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
