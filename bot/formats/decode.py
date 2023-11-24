@@ -8,14 +8,17 @@ def decode_teachers(rawNames):
     Декодирует ФИО преподавателей используя API CMS
     :param rawNames: список необработанных ФИО
     """
-    headers = {
-        "Authorization": f"Bearer {config.cmstoken}"}
+    if not config.cmstoken:
+        return rawNames
+
+    headers = {"Authorization": f"Bearer {config.cmstoken}"}
     params = {"rawNames": ",".join(rawNames)}
 
     response = requests.get(
         "https://cms.mirea.ninja/api/get-full-teacher-name",
         headers=headers,
-        params=params)
+        params=params,
+    )
 
     if response.status_code == 200:
         data = response.json()
@@ -24,7 +27,6 @@ def decode_teachers(rawNames):
             decoded_names = {}
 
             for names in data:
-
                 if len(names["possibleFullNames"]) == 1:
                     decomposed_name = names["possibleFullNames"][0]
                     name = []
@@ -44,7 +46,9 @@ def decode_teachers(rawNames):
 
             # Create a list of decoded names in the same order as raw names
             decoded_list = [
-                decoded_names[raw_name] if raw_name in decoded_names else raw_name for raw_name in rawNames]
+                decoded_names[raw_name] if raw_name in decoded_names else raw_name
+                for raw_name in rawNames
+            ]
 
         else:
             decoded_list = rawNames
