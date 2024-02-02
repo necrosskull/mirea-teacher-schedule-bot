@@ -1,16 +1,21 @@
 import json
 import re
 
-from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
-from telegram.ext import CallbackContext, InlineQueryHandler, ChosenInlineResultHandler, CallbackQueryHandler
+from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
+from telegram.ext import (
+    CallbackContext,
+    CallbackQueryHandler,
+    ChosenInlineResultHandler,
+    InlineQueryHandler,
+)
 
-import bot.InlineStep as InlineStep
-import bot.handlers.construct as construct
 import bot.formats.decode as decode
-import bot.handlers.handlers as handlers
-import bot.lazy_logger as logger
 import bot.formats.formatting as formatting
+import bot.handlers.construct as construct
 import bot.handlers.fetch as fetch
+import bot.handlers.handlers as handlers
+import bot.InlineStep as InlineStep
+import bot.lazy_logger as logger
 
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, GETROOM, ROOM_CLARIFY = range(6)
 
@@ -27,11 +32,17 @@ async def handle_inline_query(update: Update, context: CallbackContext):
     if len(update.inline_query.query) < 2:
         return
 
-    logger.lazy_logger.info(json.dumps(
-        {"type": "query",
-         "queryId": update.inline_query.id,
-         "query": update.inline_query.query.lower(),
-         **update.inline_query.from_user.to_dict()}, ensure_ascii=False))
+    logger.lazy_logger.info(
+        json.dumps(
+            {
+                "type": "query",
+                "queryId": update.inline_query.id,
+                "query": update.inline_query.query.lower(),
+                **update.inline_query.from_user.to_dict(),
+            },
+            ensure_ascii=False,
+        )
+    )
 
     inline_query = update.inline_query
     query = inline_query.query.lower()
@@ -39,7 +50,7 @@ async def handle_inline_query(update: Update, context: CallbackContext):
     if "ауд" in query:
         await handle_room_query(update, context, query)
 
-    elif re.match(re.compile(r'[а-я]{4}-\d{2}-\d{2}', re.IGNORECASE), query):
+    elif re.match(re.compile(r"[а-я]{4}-\d{2}-\d{2}", re.IGNORECASE), query):
         await handle_group_query(update, context, query)
 
     else:
@@ -63,23 +74,25 @@ async def handle_room_query(update: Update, context: CallbackContext, query: str
     if not available_rooms:
         return
 
-    context.user_data['available_rooms'] = available_rooms
+    context.user_data["available_rooms"] = available_rooms
 
     inline_results = []
 
     for room in available_rooms[:10]:
         room_name, room_id, campus = room.split(":")
         room_text = f"{room_name} {campus}"
-        inline_results.append(InlineQueryResultArticle(
-            id=room_id,
-            title=room_text,
-            description="Нажми, чтобы посмотреть расписание",
-            input_message_content=InputTextMessageContent(
-                message_text=f"Выбрана аудитория: {room_text}!\n" +
-                             f"Выберите неделю:"
-            ),
-            reply_markup=construct.construct_weeks_markup(),
-        ))
+        inline_results.append(
+            InlineQueryResultArticle(
+                id=room_id,
+                title=room_text,
+                description="Нажми, чтобы посмотреть расписание",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"Выбрана аудитория: {room_text}!\n"
+                    + "Выберите неделю:"
+                ),
+                reply_markup=construct.construct_weeks_markup(),
+            )
+        )
 
     await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
@@ -96,16 +109,17 @@ async def handle_group_query(update: Update, context: CallbackContext, query: st
     if group_schedule is None:
         return
 
-    inline_results = [InlineQueryResultArticle(
-        id=query,
-        title=query,
-        description="Нажми, чтобы посмотреть расписание",
-        input_message_content=InputTextMessageContent(
-            message_text=f"Выбрана группа: {query}!\n" +
-                         f"Выберите неделю:"
-        ),
-        reply_markup=construct.construct_weeks_markup(),
-    )]
+    inline_results = [
+        InlineQueryResultArticle(
+            id=query,
+            title=query,
+            description="Нажми, чтобы посмотреть расписание",
+            input_message_content=InputTextMessageContent(
+                message_text=f"Выбрана группа: {query}!\n" + "Выберите неделю:"
+            ),
+            reply_markup=construct.construct_weeks_markup(),
+        )
+    ]
 
     await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
@@ -125,8 +139,8 @@ async def handle_teacher_query(update: Update, context: CallbackContext, query: 
 
     if len(name_parts) > 1:
         last_name = name_parts[0]
-        initials = ''.join([part[0] + '.' for part in name_parts[1:3]])
-        query = last_name + ' ' + initials
+        initials = "".join([part[0] + "." for part in name_parts[1:3]])
+        query = last_name + " " + initials
 
     teacher_schedule = fetch.fetch_schedule_by_name(query)
 
@@ -143,16 +157,18 @@ async def handle_teacher_query(update: Update, context: CallbackContext, query: 
     decoded_surnames = decode.decode_teachers(surnames)
 
     for surname, decoded_surname in zip(surnames, decoded_surnames):
-        inline_results.append(InlineQueryResultArticle(
-            id=surname,
-            title=decoded_surname,
-            description="Нажми, чтобы посмотреть расписание",
-            input_message_content=InputTextMessageContent(
-                message_text=f"Выбран преподаватель: {decoded_surname}!\n" +
-                             f"Выберите неделю:"
-            ),
-            reply_markup=construct.construct_weeks_markup(),
-        ))
+        inline_results.append(
+            InlineQueryResultArticle(
+                id=surname,
+                title=decoded_surname,
+                description="Нажми, чтобы посмотреть расписание",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"Выбран преподаватель: {decoded_surname}!\n"
+                    + "Выберите неделю:"
+                ),
+                reply_markup=construct.construct_weeks_markup(),
+            )
+        )
 
     await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
 
@@ -171,14 +187,16 @@ async def answer_inline_handler(update: Update, context: CallbackContext):
 
         else:
             context.user_data["room_id"] = update.chosen_inline_result.result_id
-            for room in context.user_data['available_rooms']:
-                room_name, room_id, campus = room.split(':')
+            for room in context.user_data["available_rooms"]:
+                room_name, room_id, campus = room.split(":")
                 if room_id == update.chosen_inline_result.result_id:
-                    context.user_data['room'] = room_name
-                    context.user_data['campus'] = campus
+                    context.user_data["room"] = room_name
+                    context.user_data["campus"] = campus
 
         context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
-        context.user_data["inline_message_id"] = update.chosen_inline_result.inline_message_id
+        context.user_data[
+            "inline_message_id"
+        ] = update.chosen_inline_result.inline_message_id
         context.user_data["message_id"] = update.chosen_inline_result.inline_message_id
 
     return
@@ -195,40 +213,58 @@ async def inline_dispatcher(update: Update, context: CallbackContext):
     # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
     # меню, то отказываем в обработке
 
-    if update.callback_query.inline_message_id and update.callback_query.inline_message_id != \
-            context.user_data["inline_message_id"]:
+    if (
+        update.callback_query.inline_message_id
+        and update.callback_query.inline_message_id
+        != context.user_data["inline_message_id"]
+    ):
         await deny_inline_usage(update)
         return
 
     status = context.user_data["inline_step"]
-    if status == InlineStep.EInlineStep.completed or status == InlineStep.EInlineStep.ask_teacher:
+    if (
+        status == InlineStep.EInlineStep.completed
+        or status == InlineStep.EInlineStep.ask_teacher
+    ):
         await deny_inline_usage(update)
         return
 
     if context.user_data["state"] == "get_room":
-        context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(context.user_data["room_id"])
+        context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(
+            context.user_data["room_id"]
+        )
 
     elif context.user_data["state"] == "get_group":
-        context.user_data["schedule"] = fetch.fetch_schedule_by_group(context.user_data["group"])
+        context.user_data["schedule"] = fetch.fetch_schedule_by_group(
+            context.user_data["group"]
+        )
 
     else:
         context.user_data["schedule"] = fetch.fetch_schedule_by_name(
-            context.user_data["teacher"])
+            context.user_data["teacher"]
+        )
 
-    if status == InlineStep.EInlineStep.ask_week:  # Изначально мы находимся на этапе выбора недели
-        context.user_data['available_teachers'] = None
-        context.user_data['available_rooms'] = None
+    if (
+        status == InlineStep.EInlineStep.ask_week
+    ):  # Изначально мы находимся на этапе выбора недели
+        context.user_data["available_teachers"] = None
+        context.user_data["available_rooms"] = None
 
-        target = await handlers.got_week_handler(update, context)  # Обработка выбора недели
+        target = await handlers.got_week_handler(
+            update, context
+        )  # Обработка выбора недели
         # Затем как только мы выбрали неделю, мы переходим на этап выбора дня
         if target == GETDAY:
             context.user_data["inline_step"] = InlineStep.EInlineStep.ask_day
 
-    if status == InlineStep.EInlineStep.ask_day:  # При выборе дня, статус меняется на ask_day
-
+    if (
+        status == InlineStep.EInlineStep.ask_day
+    ):  # При выборе дня, статус меняется на ask_day
         target = await handlers.got_day_handler(update, context)  # Обработка выбора дня
 
-        if target == GETWEEK:  # Если пользователь вернулся назад на выбор недели, то мы переходим на этап выбора недели
+        if (
+            target == GETWEEK
+        ):  # Если пользователь вернулся назад на выбор недели, то мы переходим на этап выбора недели
             context.user_data["inline_step"] = InlineStep.EInlineStep.ask_week
 
     return
@@ -240,11 +276,14 @@ async def deny_inline_usage(update: Update):
     """
     await update.callback_query.answer(
         text="Вы не можете использовать это меню, т.к. оно не относится к вашему запросу",
-        show_alert=True)
+        show_alert=True,
+    )
     return
 
 
 def init_handlers(application):
     application.add_handler(InlineQueryHandler(handle_inline_query, block=False))
-    application.add_handler(ChosenInlineResultHandler(answer_inline_handler, block=False))
+    application.add_handler(
+        ChosenInlineResultHandler(answer_inline_handler, block=False)
+    )
     application.add_handler(CallbackQueryHandler(inline_dispatcher, block=False))

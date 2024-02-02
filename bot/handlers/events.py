@@ -1,11 +1,11 @@
 import asyncio
-import time
 
 from telegram import Update
 from telegram.ext import CallbackContext, CommandHandler
-from bot.db.sqlite import ScheduleBot, db
+
 import bot.lazy_logger as logger
 from bot import config
+from bot.db.sqlite import ScheduleBot, db
 
 
 async def toggle_maintenance_mode(update: Update, context: CallbackContext):
@@ -53,9 +53,7 @@ async def send_message_to_all_users(update: Update, context: CallbackContext):
         await asyncio.sleep(0.5)
         try:
             await context.bot.send_message(
-                chat_id=user,
-                text=message,
-                parse_mode="Markdown"
+                chat_id=user, text=message, parse_mode="Markdown"
             )
             logger.lazy_logger.info(f"Message sent to {user}")
         except Exception as e:
@@ -63,5 +61,9 @@ async def send_message_to_all_users(update: Update, context: CallbackContext):
 
 
 def init_handlers(application):
-    application.add_handler(CommandHandler("work", toggle_maintenance_mode, block=False))
-    application.add_handler(CommandHandler("send", send_message_to_all_users, block=False))
+    application.add_handler(
+        CommandHandler("work", toggle_maintenance_mode, block=False)
+    )
+    application.add_handler(
+        CommandHandler("send", send_message_to_all_users, block=False)
+    )

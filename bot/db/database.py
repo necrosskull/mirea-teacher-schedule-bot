@@ -16,8 +16,8 @@ def insert_new_user(update, context):
         defaults={
             "username": user.username,
             "first_name": user.first_name,
-            "last_name": user.last_name
-        }
+            "last_name": user.last_name,
+        },
     )
 
     if not created:

@@ -9,10 +9,7 @@ import bot.handlers.fetch as fetch
 GETNAME, GETDAY, GETWEEK, TEACHER_CLARIFY, GETROOM, ROOM_CLARIFY = range(6)
 
 
-async def send_week_selector(
-        update: Update,
-        context: CallbackContext,
-        firsttime=False):
+async def send_week_selector(update: Update, context: CallbackContext, firsttime=False):
     """
     Отправка селектора недели. По умолчанию изменяет предыдущее сообщение, но при firsttime=True отправляет в виде
     нового сообщения @param update: Update class of API @param context: CallbackContext of API @param firsttime:
@@ -46,14 +43,13 @@ async def send_week_selector(
         message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=text,
-            reply_markup=construct.construct_weeks_markup()
+            reply_markup=construct.construct_weeks_markup(),
         )
         context.user_data["message_id"] = message.message_id
 
     else:
         await update.callback_query.edit_message_text(
-            text=text,
-            reply_markup=construct.construct_weeks_markup()
+            text=text, reply_markup=construct.construct_weeks_markup()
         )
 
     return GETWEEK
@@ -70,9 +66,8 @@ async def resend_name_input(update: Update, context: CallbackContext):
 
 
 async def send_teacher_clarity(
-        update: Update,
-        context: CallbackContext,
-        firsttime=False):
+    update: Update, context: CallbackContext, firsttime=False
+):
     """
     Отправляет список обнаруженных преподавателей. В случае если общение с пользователем не впервые - редактирует
     сообщение, иначе отправляет новое. @param update: Update class of API @param context: CallbackContext of API
@@ -85,14 +80,13 @@ async def send_teacher_clarity(
         message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите преподавателя:",
-            reply_markup=few_teachers_markup
+            reply_markup=few_teachers_markup,
         )
         context.user_data["message_id"] = message.message_id
 
     else:
         await update.callback_query.edit_message_text(
-            text="Выберите преподавателя:",
-            reply_markup=few_teachers_markup
+            text="Выберите преподавателя:", reply_markup=few_teachers_markup
         )
 
     return TEACHER_CLARIFY
@@ -113,21 +107,24 @@ async def send_day_selector(update: Update, context: CallbackContext):
         campus = context.user_data["campus"]
 
         if schedule:
-            room_workdays = construct.construct_teacher_workdays(week, schedule, room=room)
+            room_workdays = construct.construct_teacher_workdays(
+                week, schedule, room=room
+            )
 
             await update.callback_query.edit_message_text(
-                text=f"Выбрана аудитория: {room} {campus} \n" +
-                     f"Выбрана неделя: {week} \n" +
-                     f"Выберите день:",
-
-                reply_markup=room_workdays
+                text=f"Выбрана аудитория: {room} {campus} \n"
+                + f"Выбрана неделя: {week} \n"
+                + "Выберите день:",
+                reply_markup=room_workdays,
             )
 
             return GETDAY
 
         else:
             await update.callback_query.answer(
-                text="Ошибка\n\nВ данной аудитории нет пар\nПожалуйста выберите другую аудиторию.", show_alert=True)
+                text="Ошибка\n\nВ данной аудитории нет пар\nПожалуйста выберите другую аудиторию.",
+                show_alert=True,
+            )
 
             return GETWEEK
 
@@ -135,21 +132,24 @@ async def send_day_selector(update: Update, context: CallbackContext):
         group = context.user_data["group"]
 
         if schedule:
-            group_workdays = construct.construct_teacher_workdays(week, schedule, group=group)
+            group_workdays = construct.construct_teacher_workdays(
+                week, schedule, group=group
+            )
 
             await update.callback_query.edit_message_text(
-                text=f"Выбрана группа: {group} \n" +
-                     f"Выбрана неделя: {week} \n" +
-                     f"Выберите день:",
-
-                reply_markup=group_workdays
+                text=f"Выбрана группа: {group} \n"
+                + f"Выбрана неделя: {week} \n"
+                + "Выберите день:",
+                reply_markup=group_workdays,
             )
 
             return GETDAY
 
         else:
             await update.callback_query.answer(
-                text="Ошибка\n\nУ данной группы нет пар\nПожалуйста выберите другую группу.", show_alert=True)
+                text="Ошибка\n\nУ данной группы нет пар\nПожалуйста выберите другую группу.",
+                show_alert=True,
+            )
 
             return GETWEEK
 
@@ -157,10 +157,10 @@ async def send_day_selector(update: Update, context: CallbackContext):
     teacher_workdays = construct.construct_teacher_workdays(week, schedule)
 
     await update.callback_query.edit_message_text(
-        text=f"Выбран преподаватель: {teacher} \n" +
-             f"Выбрана неделя: {week} \n" +
-             f"Выберите день:",
-        reply_markup=teacher_workdays
+        text=f"Выбран преподаватель: {teacher} \n"
+        + f"Выбрана неделя: {week} \n"
+        + "Выберите день:",
+        reply_markup=teacher_workdays,
     )
 
     return GETDAY
@@ -180,52 +180,41 @@ async def send_result(update: Update, context: CallbackContext, selected_day):
         room = context.user_data["room"]
 
         parsed_schedule = formatting.parse(
-            schedule_data,
-            weekday,
-            week,
-            context,
-            room=room
+            schedule_data, weekday, week, context, room=room
         )
 
     elif context.user_data["state"] == "get_group":
         group = context.user_data["group"]
 
         parsed_schedule = formatting.parse(
-            schedule_data,
-            weekday,
-            week,
-            context,
-            group=group
+            schedule_data, weekday, week, context, group=group
         )
 
     else:
         teacher_surname = context.user_data["teacher"]
 
         parsed_schedule = formatting.parse(
-            schedule_data,
-            weekday,
-            week,
-            context,
-            teacher=teacher_surname
+            schedule_data, weekday, week, context, teacher=teacher_surname
         )
 
     parsed_schedule = formatting.remove_duplicates_merge_groups_with_same_lesson(
-        parsed_schedule, context)
+        parsed_schedule, context
+    )
 
     if len(parsed_schedule) == 0:
-        await update.callback_query.answer(
-            text="В этот день пар нет.", show_alert=True)
+        await update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
         return GETWEEK
 
     blocks_of_text = formatting.format_outputs(parsed_schedule, context)
 
-    return await telegram_delivery_optimisation(blocks_of_text, update, context, selected_day)
+    return await telegram_delivery_optimisation(
+        blocks_of_text, update, context, selected_day
+    )
 
 
 async def telegram_delivery_optimisation(
-        blocks: list,
-        update: Update,
-        context: CallbackContext, selected_day):
+    blocks: list, update: Update, context: CallbackContext, selected_day
+):
     week = context.user_data["week"]
 
     if not selected_day:
@@ -236,25 +225,30 @@ async def telegram_delivery_optimisation(
         room_id = context.user_data["room_id"]
         context.user_data["schedule"] = fetch.fetch_room_schedule_by_id(room_id)
         schedule = context.user_data["schedule"]
-        teacher_workdays = construct.construct_teacher_workdays(week, schedule, room=room, day=selected_day)
+        teacher_workdays = construct.construct_teacher_workdays(
+            week, schedule, room=room, day=selected_day
+        )
 
     elif context.user_data["state"] == "get_group":
         group = context.user_data["group"]
         context.user_data["schedule"] = fetch.fetch_schedule_by_group(group)
         schedule = context.user_data["schedule"]
-        teacher_workdays = construct.construct_teacher_workdays(week, schedule, group=group, day=selected_day)
+        teacher_workdays = construct.construct_teacher_workdays(
+            week, schedule, group=group, day=selected_day
+        )
 
     else:
-
         context.user_data["schedule"] = fetch.fetch_schedule_by_name(
-            context.user_data["teacher"])
+            context.user_data["teacher"]
+        )
         schedule = context.user_data["schedule"]
-        teacher_workdays = construct.construct_teacher_workdays(week, schedule, day=selected_day)
+        teacher_workdays = construct.construct_teacher_workdays(
+            week, schedule, day=selected_day
+        )
 
     chunk = ""
     first = True
     for block in blocks:
-
         if len(chunk) + len(block) <= 4096:
             chunk += block
 
@@ -263,7 +257,9 @@ async def telegram_delivery_optimisation(
                 if update.callback_query.inline_message_id:
                     await update.callback_query.answer(
                         text="Слишком длинное расписание, пожалуйста, воспользуйтесь личными сообщениями бота или "
-                             "выберите конкретный день недели", show_alert=True)
+                        "выберите конкретный день недели",
+                        show_alert=True,
+                    )
                     break
 
                 await update.callback_query.edit_message_text(chunk)
@@ -271,20 +267,23 @@ async def telegram_delivery_optimisation(
 
             else:
                 await context.bot.send_message(
-                    chat_id=update.effective_chat.id, text=chunk)
+                    chat_id=update.effective_chat.id, text=chunk
+                )
 
             chunk = block
 
     if chunk:
         if first:
             await update.callback_query.edit_message_text(
-                chunk, reply_markup=teacher_workdays)
+                chunk, reply_markup=teacher_workdays
+            )
 
         else:
             message = await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=chunk,
-                reply_markup=teacher_workdays)
+                reply_markup=teacher_workdays,
+            )
             context.user_data["message_id"] = message.message_id
 
     return GETDAY
@@ -298,14 +297,13 @@ async def send_room_clarity(update, context, firsttime=False):
         message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Выберите аудиторию",
-            reply_markup=few_rooms_markup
+            reply_markup=few_rooms_markup,
         )
         context.user_data["message_id"] = message.message_id
 
     else:
         await update.callback_query.edit_message_text(
-            text="Выберите аудиторию",
-            reply_markup=few_rooms_markup
+            text="Выберите аудиторию", reply_markup=few_rooms_markup
         )
 
     return ROOM_CLARIFY

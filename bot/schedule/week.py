@@ -34,7 +34,9 @@ def get_period(date: datetime.date) -> Period:
 def get_semester_start_date_from_period():
     current_date = datetime.date.today()
     period = get_period(current_date)
-    semester_start_date = get_semester_start_date(period.year_start, period.year_end, period.semester)
+    semester_start_date = get_semester_start_date(
+        period.year_start, period.year_end, period.semester
+    )
     return semester_start_date
 
 

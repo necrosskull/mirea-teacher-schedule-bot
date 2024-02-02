@@ -1,5 +1,6 @@
-import logging_loki
 import logging
+
+import logging_loki
 
 import bot.config as config
 

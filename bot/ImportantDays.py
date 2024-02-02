@@ -12,5 +12,5 @@ important_days = [
     ["🌷", datetime.date(year=__today_year, month=3, day=8), 2],
     ["🤡", datetime.date(year=__today_year, month=4, day=1), 2],
     ["⚒️", datetime.date(year=__today_year, month=5, day=1), 1],
-    ["🎖️", datetime.date(year=__today_year, month=5, day=9), 2]
+    ["🎖️", datetime.date(year=__today_year, month=5, day=9), 2],
 ]

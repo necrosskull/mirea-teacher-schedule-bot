@@ -1,8 +1,9 @@
 import itertools
-from datetime import datetime
-import bot.lazy_logger as logger
-import bot.formats.decode as decode
 import json
+from datetime import datetime
+
+import bot.formats.decode as decode
+import bot.lazy_logger as logger
 
 
 def format_outputs(parsed_schedule, context):

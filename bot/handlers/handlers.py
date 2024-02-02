@@ -1,19 +1,20 @@
 import datetime
 import json
-from typing import Any
 import re
-import bot.formats.formatting as formatting
-import bot.handlers.send as send
-import bot.handlers.fetch as fetch
+from typing import Any
+
 from telegram import Update
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
     ConversationHandler,
-    filters,
     MessageHandler,
+    filters,
 )
 
+import bot.formats.formatting as formatting
+import bot.handlers.fetch as fetch
+import bot.handlers.send as send
 import bot.lazy_logger as logger
 from bot.db.database import insert_new_user
 from bot.schedule.week import get_current_week_number
@@ -275,7 +276,7 @@ async def got_day_handler(update: Update, context: CallbackContext):
     try:
         await send.send_result(update, context, selected_day)
 
-    except Exception as e:
+    except Exception:
         await update.callback_query.answer(
             text="Вы уже выбрали этот день", show_alert=False
         )
