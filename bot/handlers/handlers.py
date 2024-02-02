@@ -36,10 +36,6 @@ async def got_name_handler(update: Update, context: CallbackContext):
 
     insert_new_user(update, context)
 
-    if context.bot_data["maintenance_mode"]:
-        await maintenance_message(update, context)
-        return
-
     context.user_data["state"] = "get_name"
 
     inputted_teacher = update.message.text
@@ -53,6 +49,10 @@ async def got_name_handler(update: Update, context: CallbackContext):
             ensure_ascii=False,
         )
     )
+
+    if context.bot_data["maintenance_mode"]:
+        await maintenance_message(update, context)
+        return
 
     if len(inputted_teacher) < 3:
         await context.bot.send_message(
@@ -300,19 +300,8 @@ async def got_room_handler(update: Update, context: CallbackContext):
 
     insert_new_user(update, context)
 
-    if context.bot_data["maintenance_mode"]:
-        await maintenance_message(update, context)
-        return
-
     context.user_data["state"] = "get_room"
     room = update.message.text[4:].lower()
-
-    if len(room) < 3:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Слишком короткий запрос\nПопробуйте еще раз",
-        )
-        return
 
     logger.lazy_logger.info(
         json.dumps(
@@ -324,6 +313,17 @@ async def got_room_handler(update: Update, context: CallbackContext):
             ensure_ascii=False,
         )
     )
+
+    if context.bot_data["maintenance_mode"]:
+        await maintenance_message(update, context)
+        return
+
+    if len(room) < 3:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Слишком короткий запрос\nПопробуйте еще раз",
+        )
+        return
 
     room_schedule = fetch.fetch_room_id_by_name(room)
 
@@ -366,10 +366,6 @@ async def got_group_handler(update: Update, context: CallbackContext):
 
     insert_new_user(update, context)
 
-    if context.bot_data["maintenance_mode"]:
-        await maintenance_message(update, context)
-        return
-
     context.user_data["state"] = "get_group"
 
     inputted_group = update.message.text.upper()
@@ -384,6 +380,10 @@ async def got_group_handler(update: Update, context: CallbackContext):
             ensure_ascii=False,
         )
     )
+
+    if context.bot_data["maintenance_mode"]:
+        await maintenance_message(update, context)
+        return
 
     group_schedule = fetch.fetch_schedule_by_group(inputted_group)
 
