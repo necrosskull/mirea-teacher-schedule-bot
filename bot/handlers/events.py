@@ -53,7 +53,10 @@ async def send_message_to_all_users(update: Update, context: CallbackContext):
         await asyncio.sleep(0.5)
         try:
             await context.bot.send_message(
-                chat_id=user, text=message, parse_mode="Markdown"
+                chat_id=user,
+                text=message,
+                parse_mode="Markdown",
+                disable_web_page_preview=True,
             )
             logger.lazy_logger.info(f"Message sent to {user}")
         except Exception as e:
