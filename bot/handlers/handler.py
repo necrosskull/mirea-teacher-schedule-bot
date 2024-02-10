@@ -89,12 +89,6 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def got_item_clarification_handler(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
-    """
-    Реакция бота на получение фамилии преподавателя при уточнении, при состоянии TEACHER_CLARIFY
-    @param update: Update class of API
-    @param context: CallbackContext of API
-    @return: Int код шага
-    """
     query = update.callback_query
 
     if await deny_old_message(update, context, query=query):
