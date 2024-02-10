@@ -1,21 +1,17 @@
 [tool.poetry]
-name = "mirea-teacher-schedule-bot"
+name = "new-schedule-bot"
 version = "0.1.0"
 description = ""
 authors = ["Slava Kuryaev <92830706+necrosskull@users.noreply.github.com>"]
 readme = "README.md"
-packages = [{ include = "mirea_teacher_schedule_bot" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-python-telegram-bot = "^20.6"
+python-telegram-bot = "^20.7"
 python-dotenv = "^1.0.0"
-requests = "^2.28.2"
-python-logging-loki = "^0.3.1"
-peewee = "^3.16.2"
+pydantic = "^2.5.3"
+peewee = "^3.17.1"
 
-[tool.poetry.group.dev.dependencies]
-setuptools = "^68.0.0"
 
 [build-system]
 requires = ["poetry-core"]

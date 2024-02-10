@@ -1,8 +1,8 @@
 from telegram import Update
-from telegram.ext import CallbackContext, CommandHandler
+from telegram.ext import CommandHandler, ContextTypes
 
 
-async def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Привествие бота при использовании команды /start
     """
@@ -13,8 +13,8 @@ async def start(update: Update, context: CallbackContext):
         "его фамилию, примеры:\n\n"
         "`Иванов`\n`Карпов Д.А.`\n\n"
         "Теперь доступен поиск по аудиториям и группам!\n"
-        "Для этого напишите слово `ауд` и номер аудитории, примеры:\n\n`ауд И-202`\n`ауд В-108`\n`ауд И-202-а`\n\n"
-        "Для поиска по группам напишите название группы, примеры:\n\n`ИВБО-20-23`\n`КТСО-01-23`\n\n"
+        "Примеры:\n\n`И-202`\n`В-108`\n`И202а`\n\n"
+        "Для поиска по группам напишите название группы, примеры:\n\n`ИВБО20`\n`КТСО-01-23`\n`ИКБО`\n\n"
         "Также вы можете использовать inline-режим, "
         "для этого в любом чате наберите *@mirea_teachers_bot* + *фамилию* и нажмите на кнопку с фамилией "
         "преподавателя.\n\n",
@@ -22,7 +22,7 @@ async def start(update: Update, context: CallbackContext):
     )
 
 
-async def about(update: Update, context: CallbackContext):
+async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Информация о боте при использовании команды /about
     """
