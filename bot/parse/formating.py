@@ -87,7 +87,8 @@ def format_outputs(lessons: list[Lesson], context: ContextTypes.DEFAULT_TYPE):
 
         try:
             text += f"📝 Пара № {lesson.lesson_bells.number} в ⏰ {formatted_time}\n"
-            text += f"📚 {lesson.subject} ({lesson_type})\n"
+            text += f"📝 {lesson.subject}\n"
+            text += f"📚 {lesson_type}\n"
             if len(groups) > 0:
                 text += f"👥 Группы: {groups}\n"
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
