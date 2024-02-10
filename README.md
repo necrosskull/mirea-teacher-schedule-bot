@@ -1,14 +1,12 @@
-# Телеграм бот с расписанием преподователей РТУ МИРЭА
+# Телеграм бот для просмотра расписания РТУ МИРЭА
 
 [![BOT - LINK](https://img.shields.io/static/v1?label=BOT&message=LINK&color=229ed9&style=for-the-badge)](https://t.me/mirea_teachers_bot)
 
 ## О проекте
 
-Проект представляет собой бота для телеграма, который позволяет получать расписание `преподавателей РТУ МИРЭА.`
-
 Проект написан на языке `Python` с использованием библиотеки `python-telegram-bot 20.x`
 
-Расписание берется через [API Mirea Ninja](https://github.com/mirea-ninja/rtu-mirea-timetable), который предоставляет
+Расписание берется через [API](https://github.com/0niel/university-app/tree/master/api), который предоставляет
 расписание в формате `JSON.`
 
 Бот находится в стадии активной разработки, поэтому возможны ошибки и недоработки.
