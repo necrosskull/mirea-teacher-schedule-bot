@@ -87,15 +87,13 @@ def format_outputs(lessons: list[Lesson], context: ContextTypes.DEFAULT_TYPE):
 
         try:
             text += f"📝 Пара № {lesson.lesson_bells.number} в ⏰ {formatted_time}\n"
-            text += f"📝 {lesson.subject}\n"
-            text += f"📚 Тип: {lesson_type}\n"
+            text += f"📚 {lesson.subject} ({lesson_type})\n"
             if len(groups) > 0:
                 text += f"👥 Группы: {groups}\n"
             text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
             text += f"🏫 Аудитории: {room} {campus}\n"
             text += f"📅 Неделя: {week}\n"
-            text += f"📆 День недели: {WEEKDAYS[weekday]}\n"
-            text += f"🗓️ {lesson.dates.day} {MONTHS[lesson.dates.month]}\n\n"
+            text += f"🗓️ {lesson.dates.day} {MONTHS[lesson.dates.month]} ({WEEKDAYS[weekday]})\n\n"
 
             blocks.append(text)
             text = ""
