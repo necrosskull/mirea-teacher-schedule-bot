@@ -63,7 +63,7 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if schedule_items is None:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
+            text="❌ Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
         )
         return
 
@@ -74,7 +74,7 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif len(schedule_items) == 0:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
+            text="❌ Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
             parse_mode="Markdown",
         )
 
