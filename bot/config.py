@@ -1,10 +1,20 @@
 import os
+from dataclasses import dataclass, field
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-cmstoken = os.getenv("cmstoken")
-grafana_token = os.getenv("grafana_token")
-ADMINS = list(map(int, os.getenv("ADMINS").split(",")))
-api_url = os.getenv("api_url")
+
+def parse_admins(admins_string):
+    return [int(admin) for admin in admins_string.split(",")]
+
+
+@dataclass
+class Config:
+    token: str = os.getenv("TOKEN")
+    api_url: str = os.getenv("API_URL")
+    admins: list = field(default_factory=lambda: parse_admins(os.getenv("ADMINS")))
+
+
+settings = Config()

@@ -1,7 +1,8 @@
-from peewee import *
 import os
 
-db = SqliteDatabase(os.path.join(os.path.dirname(__file__), 'data/bot.db'))
+from peewee import Model, PrimaryKeyField, SqliteDatabase, TextField
+
+db = SqliteDatabase(os.path.join(os.path.dirname(__file__), "data/bot.db"))
 
 
 class ScheduleBot(Model):

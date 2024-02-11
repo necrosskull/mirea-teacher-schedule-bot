@@ -173,3 +173,5 @@ test2.py
 bot/cmstest.py
 bot/handlers/roomtester.py
 bot/db/data/bot.db
+bot/test.py
+bot/old_main.py

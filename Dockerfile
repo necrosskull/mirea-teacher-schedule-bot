@@ -1,9 +1,9 @@
-FROM python:3.12-slim-bullseye AS python
+FROM python:3.11-slim-bullseye AS python
 
 # Poetry configuration
 ENV POETRY_HOME="/opt/poetry" \
     POETRY_NO_INTERACTION=1 \
-    POETRY_VERSION=1.4.2 \
+    POETRY_VERSION=1.7.1 \
     POETRY_VIRTUALENVS_CREATE=false
 
 # Install poetry

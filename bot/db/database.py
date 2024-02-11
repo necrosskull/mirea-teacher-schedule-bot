@@ -1,7 +1,10 @@
+from telegram import Update
+from telegram.ext import ContextTypes
+
 from bot.db.sqlite import ScheduleBot, db
 
 
-def insert_new_user(update, context):
+def insert_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Добавление нового пользователя в базу данных
     @param update: Обновление
@@ -16,8 +19,8 @@ def insert_new_user(update, context):
         defaults={
             "username": user.username,
             "first_name": user.first_name,
-            "last_name": user.last_name
-        }
+            "last_name": user.last_name,
+        },
     )
 
     if not created:

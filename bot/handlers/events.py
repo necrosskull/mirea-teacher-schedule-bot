@@ -1,17 +1,17 @@
 import asyncio
-import time
 
 from telegram import Update
-from telegram.ext import CallbackContext, CommandHandler
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+import bot.logs.lazy_logger as logger
+from bot.config import settings
 from bot.db.sqlite import ScheduleBot, db
-import bot.lazy_logger as logger
-from bot import config
 
 
-async def toggle_maintenance_mode(update: Update, context: CallbackContext):
+async def toggle_maintenance_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle maintenance mode"""
 
-    if update.message.from_user.id not in config.ADMINS:
+    if update.message.from_user.id not in settings.admins:
         return
 
     maintenance_message = " ".join(context.args) if context.args else None
@@ -31,10 +31,10 @@ async def toggle_maintenance_mode(update: Update, context: CallbackContext):
         )
 
 
-async def send_message_to_all_users(update: Update, context: CallbackContext):
+async def send_message_to_all_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send message to all users"""
 
-    if update.message.from_user.id not in config.ADMINS:
+    if update.message.from_user.id not in settings.admins:
         return
 
     if not context.args:
@@ -55,13 +55,22 @@ async def send_message_to_all_users(update: Update, context: CallbackContext):
             await context.bot.send_message(
                 chat_id=user,
                 text=message,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                disable_web_page_preview=True,
             )
-            logger.lazy_logger.info(f"Message sent to {user}")
+            logger.lazy_logger.logger.info(f"Message sent to {user}")
         except Exception as e:
-            logger.lazy_logger.info(f"Error sending message to {user}: {e}")
+            logger.lazy_logger.logger.info(f"Error sending message to {user}: {e}")
+
+            db.connect()
+            ScheduleBot.delete_by_id(user)
+            db.close()
 
 
-def init_handlers(application):
-    application.add_handler(CommandHandler("work", toggle_maintenance_mode, block=False))
-    application.add_handler(CommandHandler("send", send_message_to_all_users, block=False))
+def init_handlers(application: Application):
+    application.add_handler(
+        CommandHandler("work", toggle_maintenance_mode, block=False)
+    )
+    application.add_handler(
+        CommandHandler("send", send_message_to_all_users, block=False)
+    )
