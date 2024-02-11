@@ -58,6 +58,14 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if user_query.lower().startswith("ауд"):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="ℹ️ Для поиска по аудиториям, просто введите её название, например: `Г-212`",
+            parse_mode="Markdown",
+        )
+        return
+
     schedule_items = await search_schedule(user_query)
 
     if schedule_items is None:
