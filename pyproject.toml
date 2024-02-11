@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "new-schedule-bot"
+name = "schedule-bot"
 version = "0.1.0"
 description = ""
 authors = ["Slava Kuryaev <92830706+necrosskull@users.noreply.github.com>"]
