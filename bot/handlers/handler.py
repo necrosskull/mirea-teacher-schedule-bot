@@ -85,6 +85,7 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="❌ Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
             parse_mode="Markdown",
         )
+        return
 
     else:
         context.user_data["available_items"] = None
@@ -115,7 +116,7 @@ async def got_item_clarification_handler(
             selected_item: SearchItem = item
             break
 
-    if selected_item not in context.user_data["available_items"]:
+    if selected_item not in schedule_items:
         await update.callback_query.answer(
             text="Ошибка, сделайте новый запрос", show_alert=True
         )

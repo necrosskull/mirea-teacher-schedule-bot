@@ -66,7 +66,7 @@ async def handle_query(update: Update, context: CallbackContext, query: str):
 
     inline_results = []
 
-    context.user_data["available_items"] = schedule_items
+    context.user_data["inline_available_items"] = schedule_items
     for item in schedule_items:
         inline_results.append(
             InlineQueryResultArticle(
@@ -92,7 +92,7 @@ async def answer_inline_handler(update: Update, context: ContextTypes.DEFAULT_TY
     if update.chosen_inline_result is not None:
         print(update.chosen_inline_result.result_id)
         type, uid = update.chosen_inline_result.result_id.split(":")
-        schedule_items: list[SearchItem] = context.user_data["available_items"]
+        schedule_items: list[SearchItem] = context.user_data["inline_available_items"]
 
         selected_item = None
         for item in schedule_items:
