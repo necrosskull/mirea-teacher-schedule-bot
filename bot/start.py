@@ -2,7 +2,7 @@ import logging
 
 from telegram.ext import Application
 
-import bot.config as config
+from bot.config import settings
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -16,7 +16,7 @@ def main() -> None:
 
     application = (
         Application.builder()
-        .token(config.TELEGRAM_TOKEN)
+        .token(settings.token)
         .post_init(post_init=post_init)
         .build()
     )
