@@ -51,6 +51,7 @@ async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_query(update: Update, context: CallbackContext, query: str):
     inline_results = []
+    schedule_items = []
     description = ""
     favorite = get_user_favorites(update, context)
 
