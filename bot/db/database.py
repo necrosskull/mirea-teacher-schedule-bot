@@ -30,3 +30,21 @@ def insert_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usr.save()
 
     db.close()
+
+
+def add_favorite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db.connect()
+    user = ScheduleBot.get_by_id(update.effective_user.id)
+    user.favorite = update.message.text
+    user.save()
+    db.close()
+
+
+def get_user_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db.connect()
+    user = ScheduleBot.get_or_none(
+        ScheduleBot.id == update.effective_user.id, ScheduleBot.favorite.is_null(False)
+    )
+    favorites = user.favorite
+    db.close()
+    return favorites

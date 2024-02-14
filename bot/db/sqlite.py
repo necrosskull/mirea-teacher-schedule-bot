@@ -10,6 +10,7 @@ class ScheduleBot(Model):
     username = TextField(null=True)
     first_name = TextField(null=True)
     last_name = TextField(null=True)
+    favorite = TextField(null=True)
 
     class Meta:
         database = db
