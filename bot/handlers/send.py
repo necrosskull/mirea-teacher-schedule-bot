@@ -39,17 +39,17 @@ async def send_week_selector(
     update: Update, context: ContextTypes.DEFAULT_TYPE, firsttime=False
 ):
     selected_item: SearchItem = context.user_data["item"]
-
     type_text = ""
-    match selected_item.type:
-        case "teacher":
-            type_text = f"Расписание преподавателя: {selected_item.name}"
-        case "classroom":
-            type_text = f"Расписание аудитории: {selected_item.name}"
-        case "group":
-            type_text = f"Расписание группы: {selected_item.name}"
+    if len(selected_item.name) > 0:
+        match selected_item.type:
+            case "teacher":
+                type_text = f"ℹ️ Расписание преподавателя: {selected_item.name}"
+            case "classroom":
+                type_text = f"ℹ️ Расписание аудитории: {selected_item.name}"
+            case "group":
+                type_text = f"ℹ️ Расписание группы: {selected_item.name}"
 
-    text = f"ℹ️ {type_text}\n🗓️ Выберите неделю:"
+    text = f"{type_text}\n🗓️ Выберите неделю:"
 
     if firsttime:
         message = await context.bot.send_message(
@@ -75,15 +75,16 @@ async def send_day_selector(update: Update, context: ContextTypes.DEFAULT_TYPE):
     workdays = construct.construct_workdays(week, schedule)
 
     type_text = ""
-    match selected_item.type:
-        case "teacher":
-            type_text = f"Расписание преподавателя: {selected_item.name}"
-        case "classroom":
-            type_text = f"Расписание аудитории: {selected_item.name}"
-        case "group":
-            type_text = f"Расписание группы: {selected_item.name}"
+    if len(selected_item.name) > 0:
+        match selected_item.type:
+            case "teacher":
+                type_text = f"ℹ️ Расписание преподавателя: {selected_item.name}"
+            case "classroom":
+                type_text = f"ℹ️ Расписание аудитории: {selected_item.name}"
+            case "group":
+                type_text = f"ℹ️ Расписание группы: {selected_item.name}"
 
-    text = f"ℹ️ {type_text}\n🗓️ Выбрана неделя: {week}\n📅 Выберите день:"
+    text = f"{type_text}\n🗓️ Выбрана неделя: {week}\n📅 Выберите день:"
 
     await update.callback_query.edit_message_text(
         text=text,

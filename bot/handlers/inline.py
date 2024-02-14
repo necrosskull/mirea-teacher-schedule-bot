@@ -65,9 +65,30 @@ async def handle_query(update: Update, context: CallbackContext, query: str):
         schedule_items: list[SearchItem] = await search_schedule(query)
 
     for item in schedule_items:
+        name = item.name
+        if item.type == "teacher":
+            name_parts = item.name.split()
+
+            if len(name_parts) > 1:
+                last_name = name_parts[0]
+
+                # Для запроса вида "Иванов И.И. или Иванов И.И"
+                if (
+                    name_parts[1][-1] == "."
+                    or len(name_parts[1]) > 1
+                    and name_parts[1][-2] == "."
+                ):
+                    initials = name_parts[1]
+                else:
+                    # Для запроса вида "Иванов Иван Иванович и прочих"
+                    initials = "".join([part[0] + "." for part in name_parts[1:3]])
+
+                name = last_name + " " + initials
+        id_str = f"{item.type}:{item.uid}:{name}"
+
         inline_results.append(
             InlineQueryResultArticle(
-                id=f"{item.type}:{item.uid}",
+                id=id_str,
                 title=item.name,
                 description=description,
                 input_message_content=InputTextMessageContent(
@@ -78,9 +99,10 @@ async def handle_query(update: Update, context: CallbackContext, query: str):
             )
         )
 
-    context.user_data["inline_available_items"] = schedule_items
     return await update.inline_query.answer(
-        inline_results, cache_time=1, is_personal=True
+        inline_results,
+        cache_time=5,
+        is_personal=True,
     )
 
 
@@ -90,14 +112,9 @@ async def answer_inline_handler(update: Update, context: ContextTypes.DEFAULT_TY
     и выставляет текущий шаг Inline запроса на ask_day
     """
     if update.chosen_inline_result is not None:
-        type, uid = update.chosen_inline_result.result_id.split(":")
-        schedule_items: list[SearchItem] = context.user_data["inline_available_items"]
+        type, uid, name = update.chosen_inline_result.result_id.split(":")
 
-        selected_item = None
-        for item in schedule_items:
-            if item.type == type and item.uid == int(uid):
-                selected_item: SearchItem = item
-                break
+        selected_item = SearchItem(type=type, uid=uid, name=name)
 
         context.user_data["item"] = selected_item
 
