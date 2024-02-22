@@ -12,24 +12,28 @@ def insert_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     @return: None
     """
     user = update.effective_user
-    db.connect()
+    try:
+        db.connect()
 
-    usr, created = ScheduleBot.get_or_create(
-        id=user.id,
-        defaults={
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-        },
-    )
+        usr, created = ScheduleBot.get_or_create(
+            id=user.id,
+            defaults={
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+        )
 
-    if not created:
-        usr.username = user.username
-        usr.first_name = user.first_name
-        usr.last_name = user.last_name
-        usr.save()
+        if not created:
+            usr.username = user.username
+            usr.first_name = user.first_name
+            usr.last_name = user.last_name
+            usr.save()
 
-    db.close()
+    except Exception:
+        pass
+    finally:
+        db.close()
 
 
 def add_favorite(update: Update, context: ContextTypes.DEFAULT_TYPE):
