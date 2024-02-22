@@ -15,7 +15,7 @@ async def get_schedule(target: SearchItem) -> ScheduleData | None:
             response.raise_for_status()
             json_response = response.json()
 
-        except httpx.RequestError:
+        except Exception:
             return None
 
         return ScheduleData(**json_response)

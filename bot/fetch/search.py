@@ -48,6 +48,6 @@ async def search_schedule(query) -> list[SearchItem] | None:
                         results[search_type].append(SearchItem(**item))
 
             search_results = SearchResults(**results)
-        except httpx.RequestError:
+        except Exception:
             return None
     return [item for _, items in search_results for item in items]
