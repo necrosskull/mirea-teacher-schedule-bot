@@ -6,13 +6,14 @@ from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
+    CommandHandler,
     ContextTypes,
     ConversationHandler,
     MessageHandler,
     filters,
 )
 
-from bot.db.database import insert_new_user
+from bot.db.database import get_user_favorites, insert_new_user
 from bot.fetch.models import SearchItem
 from bot.fetch.schedule import get_schedule
 from bot.fetch.search import search_schedule
@@ -21,7 +22,9 @@ from bot.handlers import states as st
 from bot.logs.lazy_logger import lazy_logger
 
 
-async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_query_handler(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, fav=None
+):
     """
     Реакция бота на получение запроса от пользователя
     :param update - Update класс API
@@ -35,7 +38,11 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     insert_new_user(update, context)
 
-    user_query = update.message.text
+    if fav:
+        user_query = fav
+    else:
+        user_query = update.message.text
+
     lazy_logger.logger.info(
         json.dumps(
             {
@@ -85,6 +92,7 @@ async def get_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="❌ Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
             parse_mode="Markdown",
         )
+        return
 
     else:
         context.user_data["available_items"] = None
@@ -115,7 +123,7 @@ async def got_item_clarification_handler(
             selected_item: SearchItem = item
             break
 
-    if selected_item not in context.user_data["available_items"]:
+    if selected_item not in schedule_items:
         await update.callback_query.answer(
             text="Ошибка, сделайте новый запрос", show_alert=True
         )
@@ -257,12 +265,27 @@ async def maintenance_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
+async def favourite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = get_user_favorites(update, context)
+
+    if not query:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ У вас нет сохраненного расписания\nПопробуйте добавить его с помощью команды /save",
+            parse_mode="Markdown",
+        )
+        return
+
+    return await get_query_handler(update, context, fav=query)
+
+
 def init_handlers(application: Application):
     conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND, get_query_handler, block=False
             ),
+            CommandHandler("fav", favourite, block=False),
         ],
         states={
             st.ITEM_CLARIFY: [
@@ -275,6 +298,7 @@ def init_handlers(application: Application):
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND, get_query_handler, block=False
             ),
+            CommandHandler("fav", favourite, block=False),
         ],
     )
     application.add_handler(conv_handler)

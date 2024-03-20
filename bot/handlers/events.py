@@ -41,13 +41,16 @@ async def send_message_to_all_users(update: Update, context: ContextTypes.DEFAUL
         return
 
     message = update.message.text[6:]
+    try:
+        db.connect()
 
-    db.connect()
+        users = ScheduleBot.select()
+        user_ids = [user.id for user in users]
 
-    users = ScheduleBot.select()
-    user_ids = [user.id for user in users]
-
-    db.close()
+    except Exception:
+        pass
+    finally:
+        db.close()
 
     for user in user_ids:
         await asyncio.sleep(0.5)
@@ -61,10 +64,13 @@ async def send_message_to_all_users(update: Update, context: ContextTypes.DEFAUL
             logger.lazy_logger.logger.info(f"Message sent to {user}")
         except Exception as e:
             logger.lazy_logger.logger.info(f"Error sending message to {user}: {e}")
-
-            db.connect()
-            ScheduleBot.delete_by_id(user)
-            db.close()
+            try:
+                db.connect()
+                ScheduleBot.delete_by_id(user)
+            except Exception:
+                pass
+            finally:
+                db.close()
 
 
 def init_handlers(application: Application):

@@ -9,4 +9,4 @@ class EInlineStep(enum.Enum):
     unk_error = -1
 
 
-ITEM_CLARIFY, GETWEEK, GETDAY = range(3)
+ITEM_CLARIFY, GETWEEK, GETDAY = map(chr, range(3))

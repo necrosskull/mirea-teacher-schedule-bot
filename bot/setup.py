@@ -1,5 +1,6 @@
 def setup(application):
     import bot.handlers.events as events
+    import bot.handlers.favorite as favorite
     import bot.handlers.handler as handler
     import bot.handlers.info as info
     import bot.handlers.inline as inline
@@ -11,5 +12,6 @@ def setup(application):
 
     info.init_handlers(application)
     events.init_handlers(application)
+    favorite.init_handlers(application)
     handler.init_handlers(application)
     inline.init_handlers(application)

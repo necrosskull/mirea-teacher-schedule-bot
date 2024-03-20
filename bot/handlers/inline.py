@@ -13,6 +13,7 @@ from telegram.ext import (
 import bot.handlers.construct as construct
 import bot.handlers.handler as handler
 import bot.logs.lazy_logger as logger
+from bot.db.database import get_user_favorites
 from bot.fetch.models import SearchItem
 from bot.fetch.schedule import get_schedule
 from bot.fetch.search import search_schedule
@@ -29,20 +30,18 @@ async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE
     if context.bot_data["maintenance_mode"]:
         return
 
-    if len(update.inline_query.query) < 2:
-        return
-
-    logger.lazy_logger.logger.info(
-        json.dumps(
-            {
-                "type": "query",
-                "queryId": update.inline_query.id,
-                "query": update.inline_query.query.lower(),
-                **update.inline_query.from_user.to_dict(),
-            },
-            ensure_ascii=False,
+    if len(update.inline_query.query) > 2:
+        logger.lazy_logger.logger.info(
+            json.dumps(
+                {
+                    "type": "query",
+                    "queryId": update.inline_query.id,
+                    "query": update.inline_query.query.lower(),
+                    **update.inline_query.from_user.to_dict(),
+                },
+                ensure_ascii=False,
+            )
         )
-    )
 
     inline_query = update.inline_query
     query = inline_query.query.lower()
@@ -51,28 +50,47 @@ async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def handle_query(update: Update, context: CallbackContext, query: str):
-    if not query or len(query) < 3:
-        return
-
-    query = query.title()
-
-    if len(query) < 3:
-        return
-
-    schedule_items: list[SearchItem] = await search_schedule(query)
-
-    if schedule_items is None:
-        return
-
     inline_results = []
+    schedule_items = []
+    description = ""
+    favorite = get_user_favorites(update, context)
 
-    context.user_data["available_items"] = schedule_items
+    if favorite:
+        description = "Сохраненное расписание"
+        schedule_items: list[SearchItem] = await search_schedule(favorite)
+
+    if len(query) > 2:
+        description = "Нажми, чтобы посмотреть расписание"
+        inline_results = []
+        schedule_items: list[SearchItem] = await search_schedule(query)
+
     for item in schedule_items:
+        name = item.name
+        if item.type == "teacher":
+            name_parts = item.name.split()
+
+            if len(name_parts) > 1:
+                last_name = name_parts[0]
+
+                # Для запроса вида "Иванов И.И. или Иванов И.И"
+                if (
+                    name_parts[1][-1] == "."
+                    or len(name_parts[1]) > 1
+                    and name_parts[1][-2] == "."
+                ):
+                    initials = name_parts[1]
+                else:
+                    # Для запроса вида "Иванов Иван Иванович и прочих"
+                    initials = "".join([part[0] + "." for part in name_parts[1:3]])
+
+                name = last_name + " " + initials
+        id_str = f"{item.type}:{item.uid}:{name}"
+
         inline_results.append(
             InlineQueryResultArticle(
-                id=f"{item.type}:{item.uid}",
+                id=id_str,
                 title=item.name,
-                description="Нажми, чтобы посмотреть расписание",
+                description=description,
                 input_message_content=InputTextMessageContent(
                     message_text=f"ℹ️ Выбрано расписание: {item.name}!\n"
                     + "🗓️ Выберите неделю:"
@@ -81,7 +99,11 @@ async def handle_query(update: Update, context: CallbackContext, query: str):
             )
         )
 
-    await update.inline_query.answer(inline_results, cache_time=10, is_personal=True)
+    return await update.inline_query.answer(
+        inline_results,
+        cache_time=5,
+        is_personal=True,
+    )
 
 
 async def answer_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -90,18 +112,11 @@ async def answer_inline_handler(update: Update, context: ContextTypes.DEFAULT_TY
     и выставляет текущий шаг Inline запроса на ask_day
     """
     if update.chosen_inline_result is not None:
-        print(update.chosen_inline_result.result_id)
-        type, uid = update.chosen_inline_result.result_id.split(":")
-        schedule_items: list[SearchItem] = context.user_data["available_items"]
+        type, uid, name = update.chosen_inline_result.result_id.split(":")
 
-        selected_item = None
-        for item in schedule_items:
-            if item.type == type and item.uid == int(uid):
-                selected_item: SearchItem = item
-                break
+        selected_item = SearchItem(type=type, uid=uid, name=name)
 
         context.user_data["item"] = selected_item
-        print(selected_item)
 
         context.user_data["inline_step"] = EInlineStep.ask_week
         context.user_data[
