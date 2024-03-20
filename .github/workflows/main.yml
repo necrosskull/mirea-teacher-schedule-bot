@@ -1,0 +1,51 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  APP_NAME: mirea-teacher-schedule-bot
+  REGISTRY_IMAGE: cr.yandex/${{ secrets.CR_REGISTRY }}/${{ secrets.CR_IMAGE }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Registry
+        uses: yc-actions/yc-cr-login@v1
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+      - name: Build and Push Image
+        run: |
+          docker build \
+          --pull \
+          --cache-from ${{ env.REGISTRY_IMAGE }}:latest \
+          --label "org.image.title=${{ github.repository }}" \
+          --label "org.image.url=${{ github.repositoryUrl }}" \
+          --label "org.image.created=${{ github.event.created_at }}" \
+          --label "org.image.revision=${{ github.ref_name }}" \
+          --label "org.image.version=${{ github.sha }}" \
+          --tag ${{ env.REGISTRY_IMAGE }}:${{ github.sha }} \
+          .
+          docker push ${{ env.REGISTRY_IMAGE }}:${{ github.sha }}
+          docker tag ${{ env.REGISTRY_IMAGE }}:${{ github.sha }} ${{ env.REGISTRY_IMAGE }}:latest
+          docker push ${{ env.REGISTRY_IMAGE }}:latest
+
+  deploy:
+    runs-on: bot-runner
+    needs: [build]
+    steps:
+      - name: Login to Registry
+        uses: yc-actions/yc-cr-login@v1
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+      - name: Deploy
+        run: |
+          docker pull ${{ env.REGISTRY_IMAGE }}:${{ github.sha }}
+          docker container rm -f ${{ env.APP_NAME }}
+          docker run -d --name ${{ env.APP_NAME }} --env-file ${{ secrets.ENV }} \
+          ${{ env.REGISTRY_IMAGE }}:${{ github.sha }}
