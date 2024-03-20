@@ -7,7 +7,7 @@ on:
 
 env:
   APP_NAME: mirea-teacher-schedule-bot
-  REGISTRY_IMAGE: cr.yandex/${{ secrets.CR_REGISTRY }}/${{ secrets.CR_IMAGE }}
+  REGISTRY_IMAGE: ghcr.io/necrosskull/mirea-teacher-schedule-bot
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Login to Registry
-        uses: yc-actions/yc-cr-login@v1
+        run: echo ${{ secrets.CR_TOKEN }} | docker login ghcr.io -u USERNAME --password-stdin
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
       - name: Build and Push Image
@@ -40,9 +40,7 @@ jobs:
     needs: [build]
     steps:
       - name: Login to Registry
-        uses: yc-actions/yc-cr-login@v1
-        with:
-          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+        run: echo ${{ secrets.CR_TOKEN }} | docker login ghcr.io -u USERNAME --password-stdin
       - name: Deploy
         run: |
           docker pull ${{ env.REGISTRY_IMAGE }}:${{ github.sha }}
