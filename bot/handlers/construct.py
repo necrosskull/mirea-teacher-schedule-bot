@@ -37,13 +37,18 @@ def construct_weeks_markup():
     week_buttons = []
     row_buttons = []
 
-    for i in range(1, 18):
+    if current_week >= 16:
+        week_constraint = 20
+    else:
+        week_constraint = 18
+
+    for i in range(1, week_constraint):
         button_text = (
             f"{week_indicator}{i}{week_indicator1}" if i == current_week else str(i)
         )
         row_buttons.append(InlineKeyboardButton(text=button_text, callback_data=i))
 
-        if len(row_buttons) == 4 or i == 17:
+        if len(row_buttons) == 4 or i == week_constraint - 1:
             week_buttons.append(tuple(row_buttons))
             row_buttons = []
 
