@@ -37,10 +37,7 @@ def construct_weeks_markup():
     week_buttons = []
     row_buttons = []
 
-    if current_week >= 16:
-        week_constraint = 20
-    else:
-        week_constraint = 18
+    week_constraint = 18
 
     for i in range(1, week_constraint):
         button_text = (
@@ -60,7 +57,33 @@ def construct_weeks_markup():
         [InlineKeyboardButton("Назад", callback_data="back")],
     ]
 
-    reply_mark = InlineKeyboardMarkup(week_buttons + date_buttons)
+    if current_week >= 17:
+        if current_week == 17:
+            current_week_button = [
+                [
+                    InlineKeyboardButton("18", callback_data=18),
+                    InlineKeyboardButton("19", callback_data=19),
+                ]
+            ]
+        else:
+            current_week_button = [
+                [
+                    InlineKeyboardButton(
+                        f"{current_week - 1 if current_week > 18 else ''}",
+                        callback_data=current_week - 1,
+                    ),
+                    InlineKeyboardButton(
+                        f"◖{current_week}◗", callback_data=current_week
+                    ),
+                    InlineKeyboardButton(
+                        f"{current_week + 1}", callback_data=current_week + 1
+                    ),
+                ]
+            ]
+    else:
+        current_week_button = []
+
+    reply_mark = InlineKeyboardMarkup(week_buttons + current_week_button + date_buttons)
 
     return reply_mark
 
