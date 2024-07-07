@@ -33,7 +33,7 @@ def get_semester_start_date(year_start, year_end, semester):
 
 
 def get_period(date: datetime.date) -> Period:
-    if date.month >= 7:
+    if date.month >= 8:
         return Period(date.year, date.year + 1, 1)
     else:
         return Period(date.year - 1, date.year, 2)
