@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, validator
+from pydantic import BaseModel, BeforeValidator, field_validator
 
 
 class SearchItem(BaseModel):
@@ -10,7 +10,7 @@ class SearchItem(BaseModel):
     uid: int
     name: str | None = ""
 
-    @validator("type", pre=True, always=True)
+    @field_validator("type")
     def singularize_type(cls, value):
         return value[:-1] if value.endswith("s") else value
 

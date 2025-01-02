@@ -33,8 +33,10 @@ def get_semester_start_date(year_start, year_end, semester):
 
 
 def get_period(date: datetime.date) -> Period:
-    if date.month >= 7:
+    if date.month >= 8:
         return Period(date.year, date.year + 1, 1)
+    elif date.month < 2:  # Если ещё январь, то это первый семестр
+        return Period(date.year - 1, date.year, 1)
     else:
         return Period(date.year - 1, date.year, 2)
 
@@ -51,13 +53,11 @@ def get_semester_start_date_from_period():
 def get_current_week_number() -> int:
     current_date = datetime.date.today()
     semester_start_date = get_semester_start_date_from_period()
+
     if current_date < semester_start_date:
-        return 1
+        semester_start_date = semester_start_date.replace(year=current_date.year - 1)
 
-    week = current_date.isocalendar()[1] - semester_start_date.isocalendar()[1]
-
-    if current_date.isocalendar()[2] != 0:
-        week += 1
+    week = (current_date - semester_start_date).days // 7 + 1
 
     return week
 
@@ -65,14 +65,16 @@ def get_current_week_number() -> int:
 def get_week_by_date(date: datetime.date | str) -> int:
     if isinstance(date, str):
         date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+
     semester_start_date = get_semester_start_date_from_period()
+
+    if date < semester_start_date:
+        semester_start_date = semester_start_date.replace(year=date.year - 1)
+
     if date < semester_start_date:
         return 1
 
-    week = date.isocalendar()[1] - semester_start_date.isocalendar()[1]
-
-    if date.isocalendar()[2] != 0:
-        week += 1
+    week = (date - semester_start_date).days // 7 + 1
 
     return week
 
@@ -93,10 +95,19 @@ def get_dates_for_week(week_number: int) -> list[datetime.date]:
     return [start_date_of_week + datetime.timedelta(days=i) for i in range(7)][:6]
 
 
-def get_week_and_weekday(date: datetime.date | str) -> tuple[week, weekday]:
+def get_week_and_weekday(date: datetime.date | str) -> tuple[int, int]:
     if isinstance(date, str):
         date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+
     semester_start_date = get_semester_start_date_from_period()
+
+    if date < semester_start_date:
+        semester_start_date = semester_start_date.replace(year=date.year - 1)
+
+    if date < semester_start_date:
+        return 1, date.weekday() + 1
+
+    week = (date - semester_start_date).days // 7 + 1
     weekday = date.weekday() + 1
-    week = date.isocalendar()[1] - semester_start_date.isocalendar()[1] + 1
+
     return week, weekday
