@@ -11,7 +11,6 @@ from dishka.integrations.aiogram import FromDishka, inject
 
 import bot.handlers.construct as construct
 from bot.fetch.models import SearchItem
-from bot.handlers.context import get_user_data
 from bot.handlers.states import NotificationStates
 from bot.logs.lazy_logger import lazy_logger
 from bot.parse.formating import format_outputs
@@ -37,26 +36,6 @@ def _extract_item(raw_item):
             return SearchItem(**raw_item)
         except Exception:
             return None
-
-    return None
-
-
-async def _get_last_selected_item(user_id: int) -> SearchItem | None:
-    user_data = await get_user_data(user_id)
-
-    sessions = user_data.get("sessions", {})
-    if isinstance(sessions, dict):
-        for session in reversed(list(sessions.values())):
-            item = _extract_item(session.get("item")) if isinstance(session, dict) else None
-            if item is not None:
-                return item
-
-    inline_sessions = user_data.get("inline_sessions", {})
-    if isinstance(inline_sessions, dict):
-        for session in reversed(list(inline_sessions.values())):
-            item = _extract_item(session.get("item")) if isinstance(session, dict) else None
-            if item is not None:
-                return item
 
     return None
 
@@ -120,6 +99,9 @@ async def notify_start(
     user_service: FromDishka[UserService],
     schedule_service: FromDishka[ScheduleService],
 ):
+    if message.from_user is None or message.text is None:
+        return
+
     await user_service.ensure_user(message.from_user)
     command_parts = message.text.split(maxsplit=1)
 
@@ -130,11 +112,6 @@ async def notify_start(
             command_parts[1].strip(),
             schedule_service,
         )
-        return
-
-    selected_item = await _get_last_selected_item(message.from_user.id)
-    if selected_item is not None:
-        await _ask_time(message, state, selected_item)
         return
 
     await state.set_state(NotificationStates.awaiting_query)
@@ -154,6 +131,9 @@ async def notify_query_input(
     state: FSMContext,
     schedule_service: FromDishka[ScheduleService],
 ):
+    if message.text is None:
+        return
+
     await _process_notify_query(message, state, message.text.strip(), schedule_service)
 
 
@@ -166,6 +146,9 @@ async def notify_item_text_fallback(
     state: FSMContext,
     schedule_service: FromDishka[ScheduleService],
 ):
+    if message.text is None:
+        return
+
     await _process_notify_query(message, state, message.text.strip(), schedule_service)
 
 
@@ -221,6 +204,9 @@ async def notify_set_time(
     state: FSMContext,
     notification_service: FromDishka[NotificationService],
 ):
+    if message.from_user is None or message.text is None:
+        return
+
     time_value = message.text.strip()
 
     if not TIME_PATTERN.fullmatch(time_value):
@@ -255,6 +241,9 @@ async def notify_off(
     state: FSMContext,
     notification_service: FromDishka[NotificationService],
 ):
+    if message.from_user is None:
+        return
+
     await notification_service.disable_notification(message.from_user.id)
     _reset_user_delivery_cache(message.from_user.id)
     await state.clear()
