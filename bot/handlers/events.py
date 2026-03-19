@@ -1,8 +1,10 @@
 import asyncio
+import re
 
 from aiogram import Router
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka, inject
 
 import bot.logs.lazy_logger as logger
@@ -11,10 +13,29 @@ from bot.handlers.context import bot_data
 from bot.service import UserService
 
 router = Router()
+SEND_LINK_PATTERN = re.compile(r"\[\[([^\]|]{1,64})\|(https?://\S+)\]\]\s*$")
 
 
 def _is_admin(message: Message) -> bool:
     return message.from_user.id in settings.admins
+
+
+def _extract_inline_link(text: str) -> tuple[str, InlineKeyboardMarkup | None]:
+    match = SEND_LINK_PATTERN.search(text)
+    if not match:
+        return text, None
+
+    button_text = match.group(1).strip()
+    button_url = match.group(2).strip()
+
+    if not button_text:
+        return text, None
+
+    cleaned_text = text[: match.start()].rstrip()
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=button_text, url=button_url)]]
+    )
+    return cleaned_text, markup
 
 
 @router.message(Command("work"))
@@ -51,7 +72,7 @@ async def send_message_to_all_users(
     if len(command_parts) < 2:
         return
 
-    text_to_send = command_parts[1]
+    text_to_send, reply_markup = _extract_inline_link(command_parts[1])
     user_ids = await user_service.get_all_user_ids()
 
     for user in user_ids:
@@ -60,7 +81,9 @@ async def send_message_to_all_users(
             await message.bot.send_message(
                 chat_id=user,
                 text=text_to_send,
+                parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
+                reply_markup=reply_markup,
             )
             logger.lazy_logger.logger.info(f"Message sent to {user}")
         except Exception as e:
