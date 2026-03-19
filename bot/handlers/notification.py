@@ -21,7 +21,6 @@ router = Router()
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 NOTIFY_CONCURRENCY = 10
 NOTIFY_POLL_INTERVAL_SECONDS = 10
-MSK_TIMEZONE = datetime.timezone(datetime.timedelta(hours=3))
 
 
 def _extract_item(raw_item):
@@ -55,7 +54,7 @@ async def _send_blocks(bot, chat_id: int, header: str, blocks: list[str]):
 
 
 def _get_current_msk_time() -> datetime.datetime:
-    return datetime.datetime.now(tz=MSK_TIMEZONE)
+    return datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=3)
 
 
 async def _mark_notification_sent(
