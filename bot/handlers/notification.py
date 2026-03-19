@@ -19,12 +19,9 @@ from bot.service import NotificationService, ScheduleService, UserService
 router = Router()
 
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-DELIVERED_TODAY: set[tuple[str, int]] = set()
-
-
-def _reset_user_delivery_cache(user_id: int):
-    global DELIVERED_TODAY
-    DELIVERED_TODAY = {key for key in DELIVERED_TODAY if key[1] != user_id}
+NOTIFY_CONCURRENCY = 10
+NOTIFY_POLL_INTERVAL_SECONDS = 10
+MSK_TIMEZONE = datetime.timezone(datetime.timedelta(hours=3))
 
 
 def _extract_item(raw_item):
@@ -57,6 +54,91 @@ async def _send_blocks(bot, chat_id: int, header: str, blocks: list[str]):
         await bot.send_message(chat_id=chat_id, text=chunk)
 
 
+def _get_current_msk_time() -> datetime.datetime:
+    return datetime.datetime.now(tz=MSK_TIMEZONE)
+
+
+async def _mark_notification_sent(
+    notification_service: NotificationService, user_id: int, delivery_date: str
+):
+    marked = await notification_service.mark_notification_sent(user_id, delivery_date)
+    if not marked:
+        lazy_logger.logger.warning(
+            f"notification_worker failed to persist delivery for user={user_id}"
+        )
+
+
+async def _process_notification_user(
+    user,
+    *,
+    bot,
+    notification_service: NotificationService,
+    schedule_service: ScheduleService,
+    delivery_date: str,
+    now: datetime.datetime,
+    semaphore: asyncio.Semaphore,
+):
+    async with semaphore:
+        try:
+            lazy_logger.logger.info(
+                f"notification_worker processing user={user.id} "
+                f"type={user.notify_type} uid={user.notify_uid}"
+            )
+
+            item = SearchItem(
+                type=user.notify_type,
+                uid=int(user.notify_uid),
+                name=user.notify_name or "",
+            )
+            schedule = await schedule_service.get_schedule(item)
+
+            if schedule is None:
+                lazy_logger.logger.warning(
+                    f"notification_worker schedule fetch failed for user={user.id}"
+                )
+                await bot.send_message(
+                    chat_id=user.id,
+                    text="⚠️ Не удалось получить расписание для рассылки. Попробуйте позже.",
+                )
+                await _mark_notification_sent(
+                    notification_service, user.id, delivery_date
+                )
+                return
+
+            tomorrow = now.date() + datetime.timedelta(days=1)
+            lessons = schedule_service.get_lessons(schedule, [tomorrow])
+
+            header = (
+                f"🔔 Напоминание на завтра\n"
+                f"ℹ️ Расписание: {item.name}\n"
+                f"📅 Дата: {tomorrow.strftime('%d.%m.%Y')}"
+            )
+
+            if not lessons:
+                lazy_logger.logger.info(
+                    f"notification_worker user={user.id}: no lessons for tomorrow"
+                )
+                await bot.send_message(
+                    chat_id=user.id, text=header + "\n\nНа завтра пар нет ✅"
+                )
+                await _mark_notification_sent(
+                    notification_service, user.id, delivery_date
+                )
+                return
+
+            blocks = format_outputs(lessons, {"item": item})
+            await _send_blocks(bot, user.id, header, blocks)
+
+            lazy_logger.logger.info(
+                f"notification_worker sent tomorrow schedule to user={user.id}"
+            )
+            await _mark_notification_sent(notification_service, user.id, delivery_date)
+        except Exception as e:
+            lazy_logger.logger.exception(
+                f"notification_worker error for user={user.id}: {e}"
+            )
+
+
 async def _ask_time(message: Message, state: FSMContext, selected_item: SearchItem):
     await state.set_state(NotificationStates.awaiting_time)
     await state.update_data(notify_item=selected_item.model_dump(), notify_items=None)
@@ -75,7 +157,9 @@ async def _process_notify_query(
     schedule_items = await schedule_service.search(query)
 
     if schedule_items is None or len(schedule_items) == 0:
-        await message.answer("❌ По этому запросу расписание не найдено. Попробуйте другой запрос.")
+        await message.answer(
+            "❌ По этому запросу расписание не найдено. Попробуйте другой запрос."
+        )
         return
 
     if len(schedule_items) == 1:
@@ -83,7 +167,9 @@ async def _process_notify_query(
         return
 
     await state.set_state(NotificationStates.awaiting_item)
-    await state.update_data(notify_items=[item.model_dump() for item in schedule_items], notify_item=None)
+    await state.update_data(
+        notify_items=[item.model_dump() for item in schedule_items], notify_item=None
+    )
 
     await message.answer(
         "ℹ️ Найдено несколько вариантов. Выберите нужное расписание:",
@@ -184,7 +270,9 @@ async def notify_item_pick(callback, state: FSMContext):
             break
 
     if selected_item is None:
-        await callback.answer(text="❌ Вариант не найден, попробуйте ещё раз", show_alert=True)
+        await callback.answer(
+            text="❌ Вариант не найден, попробуйте ещё раз", show_alert=True
+        )
         return
 
     await callback.answer()
@@ -210,7 +298,9 @@ async def notify_set_time(
     time_value = message.text.strip()
 
     if not TIME_PATTERN.fullmatch(time_value):
-        await message.answer("❌ Неверный формат времени. Используйте `HH:MM`, например `08:15`.")
+        await message.answer(
+            "❌ Неверный формат времени. Используйте `HH:MM`, например `08:15`."
+        )
         return
 
     data = await state.get_data()
@@ -219,11 +309,14 @@ async def notify_set_time(
 
     if selected_item is None:
         await state.clear()
-        await message.answer("❌ Не удалось определить выбранное расписание. Повторите команду /notify.")
+        await message.answer(
+            "❌ Не удалось определить выбранное расписание. Повторите команду /notify."
+        )
         return
 
-    await notification_service.set_notification(message.from_user.id, time_value, selected_item)
-    _reset_user_delivery_cache(message.from_user.id)
+    await notification_service.set_notification(
+        message.from_user.id, time_value, selected_item
+    )
     await state.clear()
 
     await message.answer(
@@ -245,7 +338,6 @@ async def notify_off(
         return
 
     await notification_service.disable_notification(message.from_user.id)
-    _reset_user_delivery_cache(message.from_user.id)
     await state.clear()
     await message.answer("✅ Рассылка отключена.")
 
@@ -255,81 +347,47 @@ async def notification_worker(
     notification_service: NotificationService,
     schedule_service: ScheduleService,
 ):
-    global DELIVERED_TODAY
     lazy_logger.logger.info("notification_worker started")
+    semaphore = asyncio.Semaphore(NOTIFY_CONCURRENCY)
 
     while True:
-        now = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=3)  # МСК
-        today_key = now.date().isoformat()
-        notify_time = now.strftime("%H:%M")
+        started_at = _get_current_msk_time()
+        delivery_date = started_at.date().isoformat()
+        current_time = started_at.strftime("%H:%M")
 
-        users = await notification_service.get_notification_users_by_time(notify_time)
+        users = await notification_service.get_due_notification_users(
+            current_time, delivery_date
+        )
         if users:
             lazy_logger.logger.info(
-                f"notification_worker tick {notify_time}: {len(users)} user(s) matched"
+                f"notification_worker tick {current_time}: {len(users)} user(s) due"
             )
 
-        for user in users:
-            dedupe_key = (today_key, user.id)
-            if dedupe_key in DELIVERED_TODAY:
-                lazy_logger.logger.info(
-                    f"notification_worker skip user={user.id}: already delivered today"
-                )
-                continue
-
-            try:
-                lazy_logger.logger.info(
-                    f"notification_worker processing user={user.id} type={user.notify_type} uid={user.notify_uid}"
-                )
-                item = SearchItem(
-                    type=user.notify_type,
-                    uid=int(user.notify_uid),
-                    name=user.notify_name or "",
-                )
-                schedule = await schedule_service.get_schedule(item)
-
-                if schedule is None:
-                    lazy_logger.logger.warning(
-                        f"notification_worker schedule fetch failed for user={user.id}"
+            tasks = [
+                asyncio.create_task(
+                    _process_notification_user(
+                        user,
+                        bot=bot,
+                        notification_service=notification_service,
+                        schedule_service=schedule_service,
+                        delivery_date=delivery_date,
+                        now=started_at,
+                        semaphore=semaphore,
                     )
-                    await bot.send_message(
-                        chat_id=user.id,
-                        text="⚠️ Не удалось получить расписание для рассылки. Попробуйте позже.",
+                )
+                for user in users
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for user, result in zip(users, results):
+                if isinstance(result, Exception):
+                    lazy_logger.logger.exception(
+                        f"notification_worker gathered task failed for user={user.id}: {result}"
                     )
-                    DELIVERED_TODAY.add(dedupe_key)
-                    continue
 
-                tomorrow = now.date() + datetime.timedelta(days=1)
-                lessons = schedule_service.get_lessons(schedule, [tomorrow])
-
-                header = (
-                    f"🔔 Напоминание на завтра\n"
-                    f"ℹ️ Расписание: {item.name}\n"
-                    f"📅 Дата: {tomorrow.strftime('%d.%m.%Y')}"
-                )
-
-                if not lessons:
-                    lazy_logger.logger.info(
-                        f"notification_worker user={user.id}: no lessons for tomorrow"
-                    )
-                    await bot.send_message(chat_id=user.id, text=header + "\n\nНа завтра пар нет ✅")
-                    DELIVERED_TODAY.add(dedupe_key)
-                    continue
-
-                blocks = format_outputs(lessons, {"item": item})
-                await _send_blocks(bot, user.id, header, blocks)
-                lazy_logger.logger.info(
-                    f"notification_worker sent tomorrow schedule to user={user.id}"
-                )
-                DELIVERED_TODAY.add(dedupe_key)
-            except Exception as e:
-                lazy_logger.logger.exception(
-                    f"notification_worker error for user={user.id}: {e}"
-                )
-                continue
-
-        DELIVERED_TODAY = {key for key in DELIVERED_TODAY if key[0] == today_key}
-        await asyncio.sleep(20)
+        finished_at = _get_current_msk_time()
+        elapsed = (finished_at - started_at).total_seconds()
+        await asyncio.sleep(max(1, NOTIFY_POLL_INTERVAL_SECONDS - elapsed))
 
 
 def init_handlers(dispatcher):

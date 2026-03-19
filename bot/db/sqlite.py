@@ -28,7 +28,8 @@ async def init_db():
                 notify_time TEXT,
                 notify_type TEXT,
                 notify_uid INTEGER,
-                notify_name TEXT
+                notify_name TEXT,
+                last_notified_date TEXT
             )
             """
         )
@@ -52,11 +53,19 @@ async def init_db():
             "notify_type": "TEXT",
             "notify_uid": "INTEGER",
             "notify_name": "TEXT",
+            "last_notified_date": "TEXT",
         }
 
         for column, ddl in columns_to_add.items():
             if column not in existing_columns:
                 await conn.execute(f"ALTER TABLE schedulebot ADD COLUMN {column} {ddl}")
+
+        await conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_schedulebot_notifications
+            ON schedulebot (notify_enabled, notify_time, last_notified_date)
+            """
+        )
 
         await conn.commit()
 

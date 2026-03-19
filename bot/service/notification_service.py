@@ -19,8 +19,20 @@ class NotificationService:
         except Exception:
             pass
 
-    async def get_notification_users_by_time(self, notify_time: str) -> list[NotificationUser]:
+    async def get_due_notification_users(
+        self, current_time: str, delivery_date: str
+    ) -> list[NotificationUser]:
         try:
-            return await self._user_repository.get_notification_users_by_time(notify_time)
+            return await self._user_repository.get_due_notification_users(
+                current_time, delivery_date
+            )
         except Exception:
             return []
+
+    async def mark_notification_sent(self, user_id: int, delivery_date: str) -> bool:
+        try:
+            return await self._user_repository.mark_notification_sent(
+                user_id, delivery_date
+            )
+        except Exception:
+            return False

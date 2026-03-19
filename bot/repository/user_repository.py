@@ -62,7 +62,9 @@ class UserRepository:
             (user_id,),
         )
 
-    async def get_notification_users_by_time(self, notify_time: str) -> list[NotificationUser]:
+    async def get_notification_users_by_time(
+        self, notify_time: str
+    ) -> list[NotificationUser]:
         rows = await fetchall(
             """
             SELECT id, notify_type, notify_uid, notify_name
@@ -83,6 +85,44 @@ class UserRepository:
             )
             for row in rows
         ]
+
+    async def get_due_notification_users(
+        self, current_time: str, delivery_date: str
+    ) -> list[NotificationUser]:
+        rows = await fetchall(
+            """
+            SELECT id, notify_type, notify_uid, notify_name
+            FROM schedulebot
+            WHERE notify_enabled = 1
+              AND notify_time IS NOT NULL
+              AND notify_time <= ?
+              AND notify_type IS NOT NULL
+              AND notify_uid IS NOT NULL
+              AND (last_notified_date IS NULL OR last_notified_date < ?)
+            ORDER BY notify_time, id
+            """,
+            (current_time, delivery_date),
+        )
+        return [
+            NotificationUser(
+                id=row["id"],
+                notify_type=row["notify_type"],
+                notify_uid=row["notify_uid"],
+                notify_name=row["notify_name"],
+            )
+            for row in rows
+        ]
+
+    async def mark_notification_sent(self, user_id: int, delivery_date: str) -> bool:
+        await execute(
+            """
+            UPDATE schedulebot
+            SET last_notified_date = ?
+            WHERE id = ?
+            """,
+            (delivery_date, user_id),
+        )
+        return True
 
     async def get_all_user_ids(self) -> list[int]:
         rows = await fetchall("SELECT id FROM schedulebot")
