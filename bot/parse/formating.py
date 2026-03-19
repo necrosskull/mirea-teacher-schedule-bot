@@ -1,13 +1,11 @@
 import json
 
-from telegram.ext import ContextTypes
-
 from bot.fetch.models import Lesson
 from bot.logs.lazy_logger import lazy_logger
 from bot.parse.semester import get_week_and_weekday
 
 
-def format_outputs(lessons: list[Lesson], context: ContextTypes.DEFAULT_TYPE):
+def format_outputs(lessons: list[Lesson], user_data: dict):
     """
     Format the parsed schedule into human-readable text blocks.
 
@@ -102,7 +100,7 @@ def format_outputs(lessons: list[Lesson], context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             target_info = {
                 "type": "error",
-                "item": context.user_data["item"].model_dump(),
+                "item": user_data["item"].model_dump(),
                 "week": week,
                 "weekday": weekday,
                 "error": str(e),

@@ -1,52 +1,51 @@
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    ConversationHandler,
-    MessageHandler,
-    filters,
-)
+from aiogram import F, Router
+from aiogram.filters import Command
+from aiogram.filters.state import StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
+from dishka.integrations.aiogram import FromDishka, inject
 
-from bot.db.database import add_favorite, get_user_favorites, insert_new_user
+from bot.handlers.states import FavoriteStates
+from bot.service import UserService
 
-ASK_FAVOURITE = map(chr, range(3, 4))
+router = Router()
 
 
-async def save_favourite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@router.message(Command("save"))
+@inject
+async def save_favourite(
+    message: Message,
+    state: FSMContext,
+    user_service: FromDishka[UserService],
+):
     """
     Привествие бота при использовании команды /start
     """
-    insert_new_user(update, context)
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
+    await user_service.ensure_user(message.from_user)
+    await state.set_state(FavoriteStates.awaiting_favorite)
+
+    await message.answer(
         text="ℹ️ Введите запрос для сохранения в избранное\n\nПример: `ИКБО-20-23`",
-        parse_mode="Markdown",
     )
-    return ASK_FAVOURITE
 
 
-async def ask_favourite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    add_favorite(update, context)
-    query = get_user_favorites(update, context)
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
+@router.message(
+    StateFilter(FavoriteStates.awaiting_favorite), F.text & ~F.text.startswith("/")
+)
+@inject
+async def ask_favourite(
+    message: Message,
+    state: FSMContext,
+    user_service: FromDishka[UserService],
+):
+    await user_service.set_favorite(message.from_user.id, message.text)
+    await state.clear()
+
+    query = await user_service.get_favorite(message.from_user.id)
+    await message.answer(
         text=f"✅ Успешно добавлено: {query}\n\nЧтобы посмотреть сохраненное расписание, используйте команду /fav",
-        parse_mode="Markdown",
     )
-    return ConversationHandler.END
 
 
-def init_handlers(application: Application):
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("save", save_favourite, block=False)],
-        states={
-            ASK_FAVOURITE: [
-                MessageHandler(
-                    filters.TEXT & ~filters.COMMAND, ask_favourite, block=False
-                )
-            ],
-        },
-        fallbacks=[CommandHandler("save", save_favourite, block=False)],
-    )
-    application.add_handler(conv_handler)
+def init_handlers(dispatcher):
+    dispatcher.include_router(router)

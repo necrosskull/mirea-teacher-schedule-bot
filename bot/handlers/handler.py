@@ -1,29 +1,38 @@
 import datetime
 import json
 
-from telegram import Update
-from telegram.error import BadRequest
-from telegram.ext import (
-    Application,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-    ConversationHandler,
-    MessageHandler,
-    filters,
-)
+from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
+from aiogram.filters.state import StateFilter
+from aiogram.types import CallbackQuery, Message
+from dishka.integrations.aiogram import FromDishka, inject
 
-from bot.db.database import get_user_favorites, insert_new_user
 from bot.fetch.models import SearchItem
-from bot.fetch.schedule import get_schedule
-from bot.fetch.search import search_schedule
+from bot.handlers.context import bot_data, get_user_data
 from bot.handlers import send as send
 from bot.handlers import states as st
 from bot.logs.lazy_logger import lazy_logger
+from bot.service import ScheduleService, UserService
+
+router = Router()
+
+
+def _session_key_from_callback(callback: CallbackQuery) -> str | None:
+    if callback.message:
+        return str(callback.message.message_id)
+
+    if callback.inline_message_id:
+        return callback.inline_message_id
+
+    return None
 
 
 async def get_query_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, fav=None
+    message: Message,
+    user_service: UserService,
+    schedule_service: ScheduleService,
+    fav: str | None = None,
 ):
     """
     Реакция бота на получение запроса от пользователя
@@ -31,181 +40,213 @@ async def get_query_handler(
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
-    if update.message and update.message.via_bot:
-        return
-    elif update.edited_message and update.edited_message.via_bot:
+    if message.via_bot:
         return
 
-    insert_new_user(update, context)
+    await user_service.ensure_user(message.from_user)
+
+    persistent_data = await get_user_data(message.from_user.id)
+    sessions = persistent_data.get("sessions", {})
+    user_data = {}
 
     if fav:
         user_query = fav
     else:
-        user_query = update.message.text
+        user_query = message.text
 
     lazy_logger.logger.info(
         json.dumps(
             {
                 "type": "request",
                 "query": user_query.lower(),
-                **update.message.from_user.to_dict(),
+                **message.from_user.model_dump(),
             },
             ensure_ascii=False,
         )
     )
 
-    if context.bot_data["maintenance_mode"]:
-        await maintenance_message(update, context)
+    if bot_data["maintenance_mode"]:
+        await maintenance_message(message)
         return
 
     if len(user_query) < 3:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        await message.answer(
             text="❌ Слишком короткий запрос\nПопробуйте еще раз",
         )
         return
 
     if user_query.lower().startswith("ауд"):
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        await message.answer(
             text="ℹ️ Для поиска по аудиториям, просто введите её название, например: `Г-212`",
-            parse_mode="Markdown",
         )
         return
 
-    schedule_items = await search_schedule(user_query)
+    schedule_items = await schedule_service.search(user_query)
 
     if schedule_items is None:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        await message.answer(
             text="❌ Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
         )
         return
 
     if len(schedule_items) > 1:
-        context.user_data["available_items"] = schedule_items
-        return await send.send_item_clarity(update, context, True)
+        user_data["available_items"] = schedule_items
+        target = await send.send_item_clarity(
+            message,
+            message.bot,
+            user_data,
+            True,
+            chat_id=message.chat.id,
+        )
+        user_data["step"] = target
+
+        session_key = str(user_data.get("message_id"))
+        session_to_store = dict(user_data)
+        session_to_store.pop("schedule", None)
+        sessions[session_key] = session_to_store
+        persistent_data["sessions"] = sessions
+        return target
 
     elif len(schedule_items) == 0:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        await message.answer(
             text="❌ Не нашлось результатов по вашему запросу\nПопробуйте еще раз",
-            parse_mode="Markdown",
         )
         return
 
     else:
-        context.user_data["available_items"] = None
-        context.user_data["item"] = schedule_items[0]
-        context.user_data["schedule"] = await get_schedule(schedule_items[0])
+        user_data["available_items"] = None
+        user_data["item"] = schedule_items[0]
+        user_data["schedule"] = await schedule_service.get_schedule(schedule_items[0])
+        target = await send.send_week_selector(
+            message,
+            message.bot,
+            user_data,
+            True,
+            chat_id=message.chat.id,
+        )
+        user_data["step"] = target
 
-        return await send.send_week_selector(update, context, True)
+        session_key = str(user_data.get("message_id"))
+        session_to_store = dict(user_data)
+        session_to_store.pop("schedule", None)
+        sessions[session_key] = session_to_store
+        persistent_data["sessions"] = sessions
+        return target
 
 
 async def got_item_clarification_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+    callback: CallbackQuery,
+    user_data: dict,
+    schedule_service: ScheduleService,
 ):
-    query = update.callback_query
+    query = callback
 
-    if await deny_old_message(update, context, query=query):
+    if await deny_old_message(query, user_data):
         return
 
     if query.data == "back":
-        return await send.resend_name_input(update, context)
+        return await send.resend_name_input(query)
 
     type, uid = query.data.split(":")
 
-    schedule_items: list[SearchItem] = context.user_data["available_items"]
+    schedule_items: list[SearchItem] = user_data["available_items"]
 
     selected_item = None
     for item in schedule_items:
         if item.type == type and item.uid == int(uid):
-            selected_item: SearchItem = item
+            selected_item = item
             break
 
     if selected_item not in schedule_items:
-        await update.callback_query.answer(
+        await query.answer(
             text="Ошибка, сделайте новый запрос", show_alert=True
         )
+        return
 
-    context.user_data["item"] = selected_item
-    clarified_schedule = await get_schedule(selected_item)
-    context.user_data["schedule"] = clarified_schedule
+    user_data["item"] = selected_item
+    clarified_schedule = await schedule_service.get_schedule(selected_item)
+    user_data["schedule"] = clarified_schedule
 
     await query.answer()
 
-    return await send.send_week_selector(update, context)
+    target = await send.send_week_selector(query, callback.bot, user_data)
+    return target
 
 
-async def got_week_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def got_week_handler(callback: CallbackQuery, user_data: dict):
     """
     Реакция бота на получение информации о выбранной недели в состоянии GETWEEK
     @param update: Update class of API
     @param context: CallbackContext of API
     @return: Int код шага
     """
-    query = update.callback_query
+    query = callback
 
-    if await deny_old_message(update, context, query=query):
+    if await deny_old_message(query, user_data):
         return
 
     selected_button = query.data
 
     if selected_button == "back":
-        if context.user_data["available_items"] is None:
-            return await send.resend_name_input(update, context)
+        if user_data["available_items"] is None:
+            return await send.resend_name_input(query)
 
-        return await send.send_item_clarity(update, context)
+        target = await send.send_item_clarity(query, callback.bot, user_data)
+        return target
 
     elif selected_button == "today":
         today = datetime.date.today()
-        context.user_data["date"] = today
-        context.user_data["week"] = None
+        user_data["date"] = today
+        user_data["week"] = None
 
-        return await send.send_result(update, context)
+        target = await send.send_result(query, callback.bot, user_data)
+        return target
 
     elif selected_button == "tomorrow":
         tommorow = datetime.date.today() + datetime.timedelta(days=1)
-        context.user_data["date"] = tommorow
-        context.user_data["week"] = None
+        user_data["date"] = tommorow
+        user_data["week"] = None
 
-        return await send.send_result(update, context)
+        target = await send.send_result(query, callback.bot, user_data)
+        return target
 
     elif selected_button.isdigit():
         selected_week = int(selected_button)
-        context.user_data["week"] = selected_week
+        user_data["week"] = selected_week
 
-        return await send.send_day_selector(update, context)
+        target = await send.send_day_selector(query, user_data)
+        return target
 
     else:
-        await update.callback_query.answer(
+        await query.answer(
             text="Ошибка, ожидается неделя", show_alert=False
         )
 
         return st.GETWEEK
 
 
-async def got_day_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def got_day_handler(callback: CallbackQuery, user_data: dict):
     """
     Реакция бота на выбор дня недели, предоставленный пользователю, в состоянии GETDAY
     @param update: Update class of API
     @param context: CallbackContext of API
     @return: Int код шага
     """
-    query = update.callback_query
+    query = callback
     show_week = False
-    if await deny_old_message(update, context, query=query):
+    if await deny_old_message(query, user_data):
         return
 
     selected_button = query.data
 
     if selected_button == "chill":
-        await update.callback_query.answer(text="В этот день пар нет.", show_alert=True)
+        await query.answer(text="В этот день пар нет.", show_alert=True)
 
         return st.GETDAY
 
     if selected_button == "back":
-        return await send.send_week_selector(update, context)
+        target = await send.send_week_selector(query, callback.bot, user_data)
+        return target
 
     if selected_button == "week":
         selected_day = None
@@ -213,43 +254,63 @@ async def got_day_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     else:
         selected_day = selected_button
-        context.user_data["date"] = selected_day
+        user_data["date"] = selected_day
 
     try:
-        await send.send_result(update, context, show_week=show_week)
+        target = await send.send_result(query, callback.bot, user_data, show_week=show_week)
 
-    except BadRequest:
-        await update.callback_query.answer(
+    except TelegramBadRequest:
+        await query.answer(
             text="Вы уже выбрали этот день", show_alert=False
         )
+        return st.GETDAY
     else:
         await query.answer()
 
-    return st.GETDAY
+    return target
 
 
 async def deny_old_message(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, query=None
+    query: CallbackQuery,
+    user_data: dict,
 ):
-    message_id = None
-
     if query.inline_message_id:
-        message_id = query.inline_message_id
-    if query.message:
-        message_id = query.message.message_id
+        inline_ids = set(user_data.get("inline_message_ids", []))
+        legacy_inline_id = user_data.get("inline_message_id")
+        if legacy_inline_id:
+            inline_ids.add(legacy_inline_id)
 
-    if context.user_data["message_id"] != message_id:
+        if query.inline_message_id not in inline_ids:
+            await query.answer(
+                text="Это сообщение не относится к вашему текущему запросу, повторите ваш запрос!",
+                show_alert=True,
+            )
+            return True
+
+        return False
+
+    if query.message:
+        message_ids = set(user_data.get("message_ids", []))
+        legacy_message_id = user_data.get("message_id")
+        if legacy_message_id:
+            message_ids.add(legacy_message_id)
+
+        if query.message.message_id in message_ids:
+            return False
+
         await query.answer(
             text="Это сообщение не относится к вашему текущему запросу, повторите ваш запрос!",
             show_alert=True,
         )
         return True
 
+    return False
 
-async def maintenance_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def maintenance_message(message: Message):
     maintenance_text = (
-        context.bot_data["maintenance_message"]
-        if context.bot_data["maintenance_message"]
+        bot_data["maintenance_message"]
+        if bot_data["maintenance_message"]
         else None
     )
 
@@ -259,46 +320,95 @@ async def maintenance_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         else "Бот находится на техническом обслуживании, скоро всё заработает!"
     )
 
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=text,
-    )
+    await message.answer(text=text)
 
 
-async def favourite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = get_user_favorites(update, context)
+@router.message(Command("fav"))
+@inject
+async def favourite(
+    message: Message,
+    user_service: FromDishka[UserService],
+    schedule_service: FromDishka[ScheduleService],
+):
+    query = await user_service.get_favorite(message.from_user.id)
 
     if not query:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        await message.answer(
             text="❌ У вас нет сохраненного расписания\nПопробуйте добавить его с помощью команды /save",
-            parse_mode="Markdown",
         )
         return
 
-    return await get_query_handler(update, context, fav=query)
-
-
-def init_handlers(application: Application):
-    conv_handler = ConversationHandler(
-        entry_points=[
-            MessageHandler(
-                filters.TEXT & ~filters.COMMAND, get_query_handler, block=False
-            ),
-            CommandHandler("fav", favourite, block=False),
-        ],
-        states={
-            st.ITEM_CLARIFY: [
-                CallbackQueryHandler(got_item_clarification_handler, block=False)
-            ],
-            st.GETDAY: [CallbackQueryHandler(got_day_handler, block=False)],
-            st.GETWEEK: [CallbackQueryHandler(got_week_handler, block=False)],
-        },
-        fallbacks=[
-            MessageHandler(
-                filters.TEXT & ~filters.COMMAND, get_query_handler, block=False
-            ),
-            CommandHandler("fav", favourite, block=False),
-        ],
+    return await get_query_handler(
+        message,
+        user_service=user_service,
+        schedule_service=schedule_service,
+        fav=query,
     )
-    application.add_handler(conv_handler)
+
+
+@router.message(StateFilter(None), F.text & ~F.text.startswith("/"))
+@inject
+async def message_dispatcher(
+    message: Message,
+    user_service: FromDishka[UserService],
+    schedule_service: FromDishka[ScheduleService],
+):
+    await get_query_handler(
+        message,
+        user_service=user_service,
+        schedule_service=schedule_service,
+    )
+
+
+@router.callback_query(StateFilter(None), F.message)
+@inject
+async def callback_dispatcher(
+    callback: CallbackQuery,
+    schedule_service: FromDishka[ScheduleService],
+):
+    persistent_data = await get_user_data(callback.from_user.id)
+    sessions = persistent_data.get("sessions", {})
+
+    session_key = _session_key_from_callback(callback)
+    if not session_key or session_key not in sessions:
+        await callback.answer(
+            text="Это сообщение не относится к вашему текущему запросу, повторите ваш запрос!",
+            show_alert=True,
+        )
+        return
+
+    user_data = sessions[session_key]
+
+    if user_data.get("schedule") is None and user_data.get("item") is not None:
+        user_data["schedule"] = await schedule_service.get_schedule(user_data["item"])
+
+    step = user_data.get("step")
+
+    if step == st.ITEM_CLARIFY:
+        target = await got_item_clarification_handler(
+            callback,
+            user_data,
+            schedule_service=schedule_service,
+        )
+    elif step == st.GETWEEK:
+        target = await got_week_handler(callback, user_data)
+    elif step == st.GETDAY:
+        target = await got_day_handler(callback, user_data)
+    else:
+        await callback.answer(
+            text="Это сообщение не относится к вашему текущему запросу, повторите ваш запрос!",
+            show_alert=True,
+        )
+        return
+
+    if target:
+        user_data["step"] = target
+
+    session_to_store = dict(user_data)
+    session_to_store.pop("schedule", None)
+    sessions[session_key] = session_to_store
+    persistent_data["sessions"] = sessions
+
+
+def init_handlers(dispatcher):
+    dispatcher.include_router(router)

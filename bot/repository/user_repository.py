@@ -4,14 +4,8 @@ from bot.db.sqlite import NotificationUser, execute, fetchall, fetchone
 from bot.fetch.models import SearchItem
 
 
-async def insert_new_user(user: User):
-    """
-    Добавление нового пользователя в базу данных
-    @param update: Обновление
-    @param context: Контекст
-    @return: None
-    """
-    try:
+class UserRepository:
+    async def upsert_user(self, user: User):
         await execute(
             """
             INSERT INTO schedulebot (id, username, first_name, last_name)
@@ -23,36 +17,24 @@ async def insert_new_user(user: User):
             """,
             (user.id, user.username, user.first_name, user.last_name),
         )
-    except Exception:
-        pass
 
-
-async def add_favorite(user_id: int, favorite_text: str):
-    try:
+    async def set_favorite(self, user_id: int, favorite_text: str):
         await execute(
             "UPDATE schedulebot SET favorite = ? WHERE id = ?",
             (favorite_text, user_id),
         )
-    except Exception:
-        pass
 
-
-async def get_user_favorites(user_id: int):
-    try:
+    async def get_favorite(self, user_id: int) -> str | None:
         row = await fetchone(
             "SELECT favorite FROM schedulebot WHERE id = ? AND favorite IS NOT NULL",
             (user_id,),
         )
-        if row:
-            return row["favorite"]
+        if not row:
+            return None
 
-        return None
-    except Exception:
-        return None
+        return row["favorite"]
 
-
-async def set_notification(user_id: int, notify_time: str, item: SearchItem):
-    try:
+    async def set_notification(self, user_id: int, notify_time: str, item: SearchItem):
         await execute(
             """
             UPDATE schedulebot
@@ -65,12 +47,8 @@ async def set_notification(user_id: int, notify_time: str, item: SearchItem):
             """,
             (notify_time, item.type, int(item.uid), item.name, user_id),
         )
-    except Exception:
-        pass
 
-
-async def disable_notification(user_id: int):
-    try:
+    async def disable_notification(self, user_id: int):
         await execute(
             """
             UPDATE schedulebot
@@ -83,12 +61,8 @@ async def disable_notification(user_id: int):
             """,
             (user_id,),
         )
-    except Exception:
-        pass
 
-
-async def get_notification_users_by_time(notify_time: str):
-    try:
+    async def get_notification_users_by_time(self, notify_time: str) -> list[NotificationUser]:
         rows = await fetchall(
             """
             SELECT id, notify_type, notify_uid, notify_name
@@ -109,20 +83,44 @@ async def get_notification_users_by_time(notify_time: str):
             )
             for row in rows
         ]
-    except Exception:
-        return []
 
-
-async def get_all_user_ids() -> list[int]:
-    try:
+    async def get_all_user_ids(self) -> list[int]:
         rows = await fetchall("SELECT id FROM schedulebot")
         return [row["id"] for row in rows]
-    except Exception:
-        return []
 
+    async def count_all_users(self) -> int:
+        row = await fetchone("SELECT COUNT(*) AS cnt FROM schedulebot")
+        if not row:
+            return 0
 
-async def delete_user(user_id: int):
-    try:
+        return int(row["cnt"])
+
+    async def count_users_with_favorite(self) -> int:
+        row = await fetchone(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM schedulebot
+            WHERE favorite IS NOT NULL
+              AND TRIM(favorite) != ''
+            """
+        )
+        if not row:
+            return 0
+
+        return int(row["cnt"])
+
+    async def count_users_with_notifications(self) -> int:
+        row = await fetchone(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM schedulebot
+            WHERE notify_enabled = 1
+            """
+        )
+        if not row:
+            return 0
+
+        return int(row["cnt"])
+
+    async def delete_user(self, user_id: int):
         await execute("DELETE FROM schedulebot WHERE id = ?", (user_id,))
-    except Exception:
-        pass

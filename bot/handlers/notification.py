@@ -1,0 +1,347 @@
+import asyncio
+import datetime
+import re
+
+from aiogram import F, Router
+from aiogram.filters import Command
+from aiogram.filters.state import StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
+from dishka.integrations.aiogram import FromDishka, inject
+
+import bot.handlers.construct as construct
+from bot.fetch.models import SearchItem
+from bot.handlers.context import get_user_data
+from bot.handlers.states import NotificationStates
+from bot.logs.lazy_logger import lazy_logger
+from bot.parse.formating import format_outputs
+from bot.service import NotificationService, ScheduleService, UserService
+
+router = Router()
+
+TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+DELIVERED_TODAY: set[tuple[str, int]] = set()
+
+
+def _reset_user_delivery_cache(user_id: int):
+    global DELIVERED_TODAY
+    DELIVERED_TODAY = {key for key in DELIVERED_TODAY if key[1] != user_id}
+
+
+def _extract_item(raw_item):
+    if isinstance(raw_item, SearchItem):
+        return raw_item
+
+    if isinstance(raw_item, dict):
+        try:
+            return SearchItem(**raw_item)
+        except Exception:
+            return None
+
+    return None
+
+
+async def _get_last_selected_item(user_id: int) -> SearchItem | None:
+    user_data = await get_user_data(user_id)
+
+    sessions = user_data.get("sessions", {})
+    if isinstance(sessions, dict):
+        for session in reversed(list(sessions.values())):
+            item = _extract_item(session.get("item")) if isinstance(session, dict) else None
+            if item is not None:
+                return item
+
+    inline_sessions = user_data.get("inline_sessions", {})
+    if isinstance(inline_sessions, dict):
+        for session in reversed(list(inline_sessions.values())):
+            item = _extract_item(session.get("item")) if isinstance(session, dict) else None
+            if item is not None:
+                return item
+
+    return None
+
+
+async def _send_blocks(bot, chat_id: int, header: str, blocks: list[str]):
+    if not blocks:
+        await bot.send_message(chat_id=chat_id, text=header)
+        return
+
+    chunk = header + "\n\n"
+    for block in blocks:
+        if len(chunk) + len(block) <= 4096:
+            chunk += block
+        else:
+            await bot.send_message(chat_id=chat_id, text=chunk)
+            chunk = block
+
+    if chunk:
+        await bot.send_message(chat_id=chat_id, text=chunk)
+
+
+async def _ask_time(message: Message, state: FSMContext, selected_item: SearchItem):
+    await state.set_state(NotificationStates.awaiting_time)
+    await state.update_data(notify_item=selected_item.model_dump(), notify_items=None)
+    await message.answer(
+        "⏰ Введите время рассылки в формате `HH:MM` (например, `21:30`).\n"
+        "Я буду присылать расписание на завтра по выбранному расписанию."
+    )
+
+
+async def _process_notify_query(
+    message: Message,
+    state: FSMContext,
+    query: str,
+    schedule_service: ScheduleService,
+):
+    schedule_items = await schedule_service.search(query)
+
+    if schedule_items is None or len(schedule_items) == 0:
+        await message.answer("❌ По этому запросу расписание не найдено. Попробуйте другой запрос.")
+        return
+
+    if len(schedule_items) == 1:
+        await _ask_time(message, state, schedule_items[0])
+        return
+
+    await state.set_state(NotificationStates.awaiting_item)
+    await state.update_data(notify_items=[item.model_dump() for item in schedule_items], notify_item=None)
+
+    await message.answer(
+        "ℹ️ Найдено несколько вариантов. Выберите нужное расписание:",
+        reply_markup=construct.construct_item_markup(schedule_items),
+    )
+
+
+@router.message(Command("notify"))
+@inject
+async def notify_start(
+    message: Message,
+    state: FSMContext,
+    user_service: FromDishka[UserService],
+    schedule_service: FromDishka[ScheduleService],
+):
+    await user_service.ensure_user(message.from_user)
+    command_parts = message.text.split(maxsplit=1)
+
+    if len(command_parts) > 1 and command_parts[1].strip():
+        await _process_notify_query(
+            message,
+            state,
+            command_parts[1].strip(),
+            schedule_service,
+        )
+        return
+
+    selected_item = await _get_last_selected_item(message.from_user.id)
+    if selected_item is not None:
+        await _ask_time(message, state, selected_item)
+        return
+
+    await state.set_state(NotificationStates.awaiting_query)
+    await state.update_data(notify_item=None, notify_items=None)
+    await message.answer(
+        "ℹ️ Введите запрос расписания после /notify или следующим сообщением.\n"
+        "Пример: `Карпов` или `ИКБО-20-23`."
+    )
+
+
+@router.message(
+    StateFilter(NotificationStates.awaiting_query), F.text & ~F.text.startswith("/")
+)
+@inject
+async def notify_query_input(
+    message: Message,
+    state: FSMContext,
+    schedule_service: FromDishka[ScheduleService],
+):
+    await _process_notify_query(message, state, message.text.strip(), schedule_service)
+
+
+@router.message(
+    StateFilter(NotificationStates.awaiting_item), F.text & ~F.text.startswith("/")
+)
+@inject
+async def notify_item_text_fallback(
+    message: Message,
+    state: FSMContext,
+    schedule_service: FromDishka[ScheduleService],
+):
+    await _process_notify_query(message, state, message.text.strip(), schedule_service)
+
+
+@router.callback_query(StateFilter(NotificationStates.awaiting_item), F.data)
+async def notify_item_pick(callback, state: FSMContext):
+    data = await state.get_data()
+    raw_items = data.get("notify_items") or []
+    schedule_items = []
+
+    for raw_item in raw_items:
+        try:
+            schedule_items.append(SearchItem(**raw_item))
+        except Exception:
+            continue
+
+    if callback.data == "back":
+        await state.set_state(NotificationStates.awaiting_query)
+        await callback.message.edit_text(
+            "ℹ️ Введите новый запрос расписания для рассылки:"
+        )
+        await callback.answer()
+        return
+
+    if ":" not in callback.data:
+        await callback.answer(text="❌ Неверный выбор", show_alert=True)
+        return
+
+    selected_type, selected_uid = callback.data.split(":", 1)
+    selected_item = None
+    for item in schedule_items:
+        if item.type == selected_type and str(item.uid) == selected_uid:
+            selected_item = item
+            break
+
+    if selected_item is None:
+        await callback.answer(text="❌ Вариант не найден, попробуйте ещё раз", show_alert=True)
+        return
+
+    await callback.answer()
+    await callback.message.edit_text(
+        f"✅ Выбрано: {selected_item.name}\n"
+        "Теперь укажите время уведомления в формате HH:MM"
+    )
+    await _ask_time(callback.message, state, selected_item)
+
+
+@router.message(
+    StateFilter(NotificationStates.awaiting_time), F.text & ~F.text.startswith("/")
+)
+@inject
+async def notify_set_time(
+    message: Message,
+    state: FSMContext,
+    notification_service: FromDishka[NotificationService],
+):
+    time_value = message.text.strip()
+
+    if not TIME_PATTERN.fullmatch(time_value):
+        await message.answer("❌ Неверный формат времени. Используйте `HH:MM`, например `08:15`.")
+        return
+
+    data = await state.get_data()
+    raw_item = data.get("notify_item")
+    selected_item = _extract_item(raw_item)
+
+    if selected_item is None:
+        await state.clear()
+        await message.answer("❌ Не удалось определить выбранное расписание. Повторите команду /notify.")
+        return
+
+    await notification_service.set_notification(message.from_user.id, time_value, selected_item)
+    _reset_user_delivery_cache(message.from_user.id)
+    await state.clear()
+
+    await message.answer(
+        f"✅ Рассылка на завтра включена.\n"
+        f"Расписание: {selected_item.name}\n"
+        f"Время: {time_value}\n\n"
+        "Чтобы отключить: /notifyoff"
+    )
+
+
+@router.message(Command("notifyoff"))
+@inject
+async def notify_off(
+    message: Message,
+    state: FSMContext,
+    notification_service: FromDishka[NotificationService],
+):
+    await notification_service.disable_notification(message.from_user.id)
+    _reset_user_delivery_cache(message.from_user.id)
+    await state.clear()
+    await message.answer("✅ Рассылка отключена.")
+
+
+async def notification_worker(
+    bot,
+    notification_service: NotificationService,
+    schedule_service: ScheduleService,
+):
+    global DELIVERED_TODAY
+    lazy_logger.logger.info("notification_worker started")
+
+    while True:
+        now = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=3)  # МСК
+        today_key = now.date().isoformat()
+        notify_time = now.strftime("%H:%M")
+
+        users = await notification_service.get_notification_users_by_time(notify_time)
+        if users:
+            lazy_logger.logger.info(
+                f"notification_worker tick {notify_time}: {len(users)} user(s) matched"
+            )
+
+        for user in users:
+            dedupe_key = (today_key, user.id)
+            if dedupe_key in DELIVERED_TODAY:
+                lazy_logger.logger.info(
+                    f"notification_worker skip user={user.id}: already delivered today"
+                )
+                continue
+
+            try:
+                lazy_logger.logger.info(
+                    f"notification_worker processing user={user.id} type={user.notify_type} uid={user.notify_uid}"
+                )
+                item = SearchItem(
+                    type=user.notify_type,
+                    uid=int(user.notify_uid),
+                    name=user.notify_name or "",
+                )
+                schedule = await schedule_service.get_schedule(item)
+
+                if schedule is None:
+                    lazy_logger.logger.warning(
+                        f"notification_worker schedule fetch failed for user={user.id}"
+                    )
+                    await bot.send_message(
+                        chat_id=user.id,
+                        text="⚠️ Не удалось получить расписание для рассылки. Попробуйте позже.",
+                    )
+                    DELIVERED_TODAY.add(dedupe_key)
+                    continue
+
+                tomorrow = now.date() + datetime.timedelta(days=1)
+                lessons = schedule_service.get_lessons(schedule, [tomorrow])
+
+                header = (
+                    f"🔔 Напоминание на завтра\n"
+                    f"ℹ️ Расписание: {item.name}\n"
+                    f"📅 Дата: {tomorrow.strftime('%d.%m.%Y')}"
+                )
+
+                if not lessons:
+                    lazy_logger.logger.info(
+                        f"notification_worker user={user.id}: no lessons for tomorrow"
+                    )
+                    await bot.send_message(chat_id=user.id, text=header + "\n\nНа завтра пар нет ✅")
+                    DELIVERED_TODAY.add(dedupe_key)
+                    continue
+
+                blocks = format_outputs(lessons, {"item": item})
+                await _send_blocks(bot, user.id, header, blocks)
+                lazy_logger.logger.info(
+                    f"notification_worker sent tomorrow schedule to user={user.id}"
+                )
+                DELIVERED_TODAY.add(dedupe_key)
+            except Exception as e:
+                lazy_logger.logger.exception(
+                    f"notification_worker error for user={user.id}: {e}"
+                )
+                continue
+
+        DELIVERED_TODAY = {key for key in DELIVERED_TODAY if key[0] == today_key}
+        await asyncio.sleep(20)
+
+
+def init_handlers(dispatcher):
+    dispatcher.include_router(router)
