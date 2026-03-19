@@ -42,7 +42,8 @@ class UserRepository:
                 notify_time = ?,
                 notify_type = ?,
                 notify_uid = ?,
-                notify_name = ?
+                notify_name = ?,
+                last_notified_date = NULL
             WHERE id = ?
             """,
             (notify_time, item.type, int(item.uid), item.name, user_id),
@@ -56,7 +57,8 @@ class UserRepository:
                 notify_time = NULL,
                 notify_type = NULL,
                 notify_uid = NULL,
-                notify_name = NULL
+                notify_name = NULL,
+                last_notified_date = NULL
             WHERE id = ?
             """,
             (user_id,),
