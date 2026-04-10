@@ -3,6 +3,7 @@ import datetime
 import re
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters import Command
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -65,6 +66,15 @@ async def _mark_notification_sent(
         lazy_logger.logger.warning(
             f"notification_worker failed to persist delivery for user={user_id}"
         )
+
+
+async def _disable_notification_for_user(
+    notification_service: NotificationService, user_id: int
+):
+    await notification_service.disable_notification(user_id)
+    lazy_logger.logger.warning(
+        f"notification_worker disabled notification for user={user_id} after Telegram forbidden error"
+    )
 
 
 async def _process_notification_user(
@@ -132,6 +142,11 @@ async def _process_notification_user(
                 f"notification_worker sent tomorrow schedule to user={user.id}"
             )
             await _mark_notification_sent(notification_service, user.id, delivery_date)
+        except TelegramForbiddenError as e:
+            lazy_logger.logger.warning(
+                f"notification_worker user={user.id} blocked bot or chat is unavailable: {e}"
+            )
+            await _disable_notification_for_user(notification_service, user.id)
         except Exception as e:
             lazy_logger.logger.exception(
                 f"notification_worker error for user={user.id}: {e}"
