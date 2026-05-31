@@ -1,18 +1,29 @@
-[tool.poetry]
+[project]
 name = "schedule-bot"
 version = "0.1.0"
 description = ""
-authors = ["Slava Kuryaev <92830706+necrosskull@users.noreply.github.com>"]
+authors = [{ name = "Slava Kuryaev", email = "92830706+necrosskull@users.noreply.github.com" }]
+requires-python = ">=3.11,<4"
 readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "aiogram>=3.13,<4",
+    "aiosqlite>=0.20,<1",
+    "dishka>=1.4,<2",
+    "httpx>=0.26,<1",
+    "python-dotenv>=1.0.0,<2",
+    "pydantic>=2.11,<3",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-python-telegram-bot = "^20.8"
-python-dotenv = "^1.0.0"
-pydantic = "^2.5.3"
-peewee = {extras = ["playhouse"], version = "^3.17.1"}
-
+[tool.uv]
+package = false
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.9.27,<0.10.0"]
+build-backend = "uv_build"

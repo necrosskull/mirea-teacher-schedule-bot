@@ -1,68 +1,79 @@
 import json
 
-from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
-from telegram.ext import (
-    Application,
-    CallbackContext,
-    CallbackQueryHandler,
-    ChosenInlineResultHandler,
-    ContextTypes,
-    InlineQueryHandler,
+from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import (
+    CallbackQuery,
+    ChosenInlineResult,
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
 )
+from dishka.integrations.aiogram import FromDishka, inject
 
 import bot.handlers.construct as construct
 import bot.handlers.handler as handler
 import bot.logs.lazy_logger as logger
-from bot.db.database import get_user_favorites
 from bot.fetch.models import SearchItem
-from bot.fetch.schedule import get_schedule
-from bot.fetch.search import search_schedule
+from bot.handlers.context import bot_data, get_user_data
 from bot.handlers import states as st
-from bot.handlers.states import EInlineStep
+from bot.service import ScheduleService, UserService
+
+router = Router()
 
 
-async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@router.inline_query()
+@inject
+async def handle_inline_query(
+    inline_query: InlineQuery,
+    user_service: FromDishka[UserService],
+    schedule_service: FromDishka[ScheduleService],
+):
     """
     Обработчик инлайн запросов
     Создает Inline отображение
     """
 
-    if context.bot_data["maintenance_mode"]:
+    if bot_data["maintenance_mode"]:
         return
 
-    if len(update.inline_query.query) > 2:
+    if len(inline_query.query) > 2:
         logger.lazy_logger.logger.info(
             json.dumps(
                 {
                     "type": "query",
-                    "queryId": update.inline_query.id,
-                    "query": update.inline_query.query.lower(),
-                    **update.inline_query.from_user.to_dict(),
+                    "queryId": inline_query.id,
+                    "query": inline_query.query.lower(),
+                    **inline_query.from_user.model_dump(),
                 },
                 ensure_ascii=False,
             )
         )
 
-    inline_query = update.inline_query
     query = inline_query.query.lower()
 
-    await handle_query(update, context, query)
+    await handle_query(inline_query, query, user_service, schedule_service)
 
 
-async def handle_query(update: Update, context: CallbackContext, query: str):
+async def handle_query(
+    inline_query: InlineQuery,
+    query: str,
+    user_service: UserService,
+    schedule_service: ScheduleService,
+):
     inline_results = []
-    schedule_items = []
+    schedule_items: list[SearchItem] = []
     description = ""
-    favorite = get_user_favorites(update, context)
+    favorite = await user_service.get_favorite(inline_query.from_user.id)
 
     if favorite:
         description = "Сохраненное расписание"
-        schedule_items: list[SearchItem] = await search_schedule(favorite)
+        schedule_items = await schedule_service.search(favorite) or []
 
     if len(query) > 2:
         description = "Нажми, чтобы посмотреть расписание"
         inline_results = []
-        schedule_items: list[SearchItem] = await search_schedule(query)
+        schedule_items = await schedule_service.search(query) or []
 
     for item in schedule_items:
         name = item.name
@@ -99,95 +110,98 @@ async def handle_query(update: Update, context: CallbackContext, query: str):
             )
         )
 
-    return await update.inline_query.answer(
+    return await inline_query.answer(
         inline_results,
         cache_time=5,
         is_personal=True,
     )
 
 
-async def answer_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@router.chosen_inline_result()
+@inject
+async def answer_inline_handler(chosen_inline_result: ChosenInlineResult, state: FSMContext):
     """
     В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
     и выставляет текущий шаг Inline запроса на ask_day
     """
-    if update.chosen_inline_result is not None:
-        type, uid, name = update.chosen_inline_result.result_id.split(":")
+    if chosen_inline_result is not None:
+        type, uid, name = chosen_inline_result.result_id.split(":", 2)
 
-        selected_item = SearchItem(type=type, uid=uid, name=name)
+        selected_item = SearchItem(type=type, uid=int(uid), name=name)
 
-        context.user_data["item"] = selected_item
+        persistent_data = await get_user_data(chosen_inline_result.from_user.id)
+        inline_sessions = persistent_data.get("inline_sessions", {})
 
-        context.user_data["inline_step"] = EInlineStep.ask_week
-        context.user_data[
-            "inline_message_id"
-        ] = update.chosen_inline_result.inline_message_id
-        context.user_data["message_id"] = update.chosen_inline_result.inline_message_id
+        inline_sessions[chosen_inline_result.inline_message_id] = {
+            "item": selected_item,
+            "available_items": None,
+            "schedule": None,
+            "inline_message_id": chosen_inline_result.inline_message_id,
+            "inline_message_ids": [chosen_inline_result.inline_message_id],
+            "message_id": chosen_inline_result.inline_message_id,
+            "step": st.GETWEEK,
+        }
+
+        if len(inline_sessions) > 30:
+            keys = list(inline_sessions.keys())[-30:]
+            inline_sessions = {key: inline_sessions[key] for key in keys}
+
+        persistent_data["inline_sessions"] = inline_sessions
 
     return
 
 
-async def inline_dispatcher(update: Update, context: CallbackContext):
+@router.callback_query(F.inline_message_id)
+@inject
+async def inline_dispatcher(
+    callback: CallbackQuery,
+    schedule_service: FromDishka[ScheduleService],
+):
     """
     Обработка вызовов в чатах на основании Callback вызова
     """
-    if "inline_step" not in context.user_data:
-        await deny_inline_usage(update)
+    persistent_data = await get_user_data(callback.from_user.id)
+    inline_sessions = persistent_data.get("inline_sessions", {})
+
+    if callback.inline_message_id not in inline_sessions:
+        await deny_inline_usage(callback)
         return
 
-    # Если Id сообщения в котором мы нажимаем на кнопки не совпадает с тем, что было сохранено в контексте при вызове
-    # меню, то отказываем в обработке
+    user_data = inline_sessions[callback.inline_message_id]
 
-    if (
-        update.callback_query.inline_message_id
-        and update.callback_query.inline_message_id
-        != context.user_data["inline_message_id"]
-    ):
-        await deny_inline_usage(update)
+    user_data["schedule"] = await schedule_service.get_schedule(user_data["item"])
+
+    if user_data.get("step") == st.GETWEEK:
+        target = await handler.got_week_handler(callback, user_data)
+    elif user_data.get("step") == st.GETDAY:
+        target = await handler.got_day_handler(callback, user_data)
+    else:
+        await deny_inline_usage(callback)
         return
 
-    status = context.user_data["inline_step"]
-    if status == EInlineStep.completed or status == EInlineStep.ask_item:
-        await deny_inline_usage(update)
-        return
+    if target == st.GETWEEK:
+        user_data["step"] = st.GETWEEK
+    elif target == st.GETDAY:
+        user_data["step"] = st.GETDAY
 
-    context.user_data["schedule"] = await get_schedule(context.user_data["item"])
-
-    if status == EInlineStep.ask_week:  # Изначально мы находимся на этапе выбора недели
-        context.user_data["available_items"] = None
-
-        target = await handler.got_week_handler(
-            update, context
-        )  # Обработка выбора недели
-        # Затем как только мы выбрали неделю, мы переходим на этап выбора дня
-        if target == st.GETDAY:
-            context.user_data["inline_step"] = EInlineStep.ask_day
-
-    if status == EInlineStep.ask_day:  # При выборе дня, статус меняется на ask_day
-        target = await handler.got_day_handler(update, context)  # Обработка выбора дня
-
-        if (
-            target == st.GETWEEK
-        ):  # Если пользователь вернулся назад на выбор недели, то мы переходим на этап выбора недели
-            context.user_data["inline_step"] = EInlineStep.ask_week
+    session_to_store = dict(user_data)
+    session_to_store.pop("schedule", None)
+    inline_sessions[callback.inline_message_id] = session_to_store
+    persistent_data["inline_sessions"] = inline_sessions
 
     return
 
 
-async def deny_inline_usage(update: Update):
+async def deny_inline_usage(callback: CallbackQuery):
     """
     Показывает предупреждение пользователю, если он не может использовать имеющийся Inline вызов
     """
-    await update.callback_query.answer(
+    await callback.answer(
         text="Вы не можете использовать это меню, т.к. оно не относится к вашему запросу",
         show_alert=True,
     )
     return
 
 
-def init_handlers(application: Application):
-    application.add_handler(InlineQueryHandler(handle_inline_query, block=False))
-    application.add_handler(
-        ChosenInlineResultHandler(answer_inline_handler, block=False)
-    )
-    application.add_handler(CallbackQueryHandler(inline_dispatcher, block=False))
+def init_handlers(dispatcher):
+    dispatcher.include_router(router)

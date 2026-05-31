@@ -1,13 +1,17 @@
-from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import Message
+
+router = Router()
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@router.message(Command("start"))
+@router.message(Command("help"))
+async def start(message: Message):
     """
     Привествие бота при использовании команды /start
     """
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
+    await message.answer(
         text="Привет!\nЯ бот, который поможет вам найти "
         "расписание любого *преподавателя* и не только!\n\n"
         "Для получения расписания напишите:\n\n"
@@ -15,27 +19,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🧑‍🏫 Фамилию преподавателя (например, `Карпов Д.А.`)\n"
         "🏫 Номер аудитории (например, `Г-212`)\n\n"
         "Для сохранения расписания в избранное используйте команду /save.\n\n"
+        "Для уведомлений о расписании на завтра:\n"
+        "• /notify — включить рассылку и выбрать время\n"
+        "• /notifyoff — отключить рассылку\n\n"
         "Также вы можете использовать inline-режим, "
         "для этого в любом чате наберите *@mirea_teachers_bot* + *фамилию* и нажмите на кнопку с фамилией "
         "преподавателя.\n\n",
-        parse_mode="Markdown",
     )
 
 
-async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@router.message(Command("about"))
+async def about(message: Message):
     """
     Информация о боте при использовании команды /about
     """
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
+    await message.answer(
         text="*MIREA Teacher Schedule Bot*\n"
         "*Разработан* [necrosskull](https://github.com/necrosskull)\n\n"
         "*Исходный код: https://github.com/necrosskull/mirea-teacher-schedule-bot*",
-        parse_mode="Markdown",
     )
 
 
-def init_handlers(application):
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("about", about))
-    application.add_handler(CommandHandler("help", start))
+def init_handlers(dispatcher):
+    dispatcher.include_router(router)

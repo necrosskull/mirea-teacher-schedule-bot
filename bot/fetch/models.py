@@ -45,8 +45,15 @@ class Teacher(BaseModel):
 
 class LessonBells(BaseModel):
     end_time: str | None = ""
-    number: int | None = ""
+    number: int = 0
     start_time: str | None = ""
+
+    @field_validator("number", mode="before")
+    def normalize_number(cls, value):
+        if value in ("", None):
+            return 0
+
+        return value
 
 
 def validate_dates(value: list[str]) -> list[date]:

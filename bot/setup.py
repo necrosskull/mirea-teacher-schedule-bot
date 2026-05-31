@@ -1,17 +1,21 @@
-def setup(application):
+async def setup(dispatcher):
     import bot.handlers.events as events
     import bot.handlers.favorite as favorite
     import bot.handlers.handler as handler
     import bot.handlers.info as info
     import bot.handlers.inline as inline
-    from bot.db.sqlite import ScheduleBot, db
+    import bot.handlers.notification as notification
+    from bot.handlers.context import bot_data
+    from bot.db.sqlite import init_db
 
-    db.connect()
-    db.create_tables([ScheduleBot])
-    db.close()
+    await init_db()
 
-    info.init_handlers(application)
-    events.init_handlers(application)
-    favorite.init_handlers(application)
-    handler.init_handlers(application)
-    inline.init_handlers(application)
+    bot_data["maintenance_mode"] = False
+    bot_data["maintenance_message"] = None
+
+    info.init_handlers(dispatcher)
+    events.init_handlers(dispatcher)
+    favorite.init_handlers(dispatcher)
+    handler.init_handlers(dispatcher)
+    inline.init_handlers(dispatcher)
+    notification.init_handlers(dispatcher)

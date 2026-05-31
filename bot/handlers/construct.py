@@ -1,6 +1,6 @@
 import datetime
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from bot.fetch.models import Lesson, ScheduleData, SearchItem
 from bot.fetch.schedule import get_lessons
@@ -9,12 +9,12 @@ from bot.parse.semester import get_current_week_number, get_dates_for_week
 
 
 def construct_item_markup(schedule_items: list[SearchItem]) -> InlineKeyboardMarkup:
-    btns = []
+    btns: list[list[InlineKeyboardButton]] = []
     for item in schedule_items:
         callback = f"{item.type}:{item.uid}"
-        btns = btns + [[InlineKeyboardButton(item.name, callback_data=callback)]]
-    btns = btns + [[(InlineKeyboardButton("Назад", callback_data="back"))]]
-    TEACHER_CLARIFY_MARKUP = InlineKeyboardMarkup(btns)
+        btns.append([InlineKeyboardButton(text=item.name, callback_data=callback)])
+    btns.append([InlineKeyboardButton(text="Назад", callback_data="back")])
+    TEACHER_CLARIFY_MARKUP = InlineKeyboardMarkup(inline_keyboard=btns)
 
     return TEACHER_CLARIFY_MARKUP
 
@@ -34,8 +34,8 @@ def construct_weeks_markup():
             week_indicator = day[ImportantDays.SIGN]
             week_indicator1 = day[ImportantDays.SIGN]
 
-    week_buttons = []
-    row_buttons = []
+    week_buttons: list[list[InlineKeyboardButton]] = []
+    row_buttons: list[InlineKeyboardButton] = []
 
     week_constraint = 18
 
@@ -43,47 +43,51 @@ def construct_weeks_markup():
         button_text = (
             f"{week_indicator}{i}{week_indicator1}" if i == current_week else str(i)
         )
-        row_buttons.append(InlineKeyboardButton(text=button_text, callback_data=i))
+        row_buttons.append(
+            InlineKeyboardButton(text=button_text, callback_data=str(i))
+        )
 
         if len(row_buttons) == 4 or i == week_constraint - 1:
-            week_buttons.append(tuple(row_buttons))
+            week_buttons.append(row_buttons)
             row_buttons = []
 
     date_buttons = [
         [
-            InlineKeyboardButton("Сегодня", callback_data="today"),
-            InlineKeyboardButton("Завтра", callback_data="tomorrow"),
+            InlineKeyboardButton(text="Сегодня", callback_data="today"),
+            InlineKeyboardButton(text="Завтра", callback_data="tomorrow"),
         ],
-        [InlineKeyboardButton("Назад", callback_data="back")],
+        [InlineKeyboardButton(text="Назад", callback_data="back")],
     ]
 
     if current_week >= 17:
         if current_week == 17:
             current_week_button = [
                 [
-                    InlineKeyboardButton("18", callback_data=18),
-                    InlineKeyboardButton("19", callback_data=19),
+                    InlineKeyboardButton(text="18", callback_data="18"),
+                    InlineKeyboardButton(text="19", callback_data="19"),
                 ]
             ]
         else:
             current_week_button = [
                 [
                     InlineKeyboardButton(
-                        f"{current_week - 1 if current_week > 18 else ''}",
-                        callback_data=current_week - 1,
+                        text=f"{current_week - 1 if current_week > 18 else ''}",
+                        callback_data=str(current_week - 1),
                     ),
                     InlineKeyboardButton(
-                        f"◖{current_week}◗", callback_data=current_week
+                        text=f"◖{current_week}◗", callback_data=str(current_week)
                     ),
                     InlineKeyboardButton(
-                        f"{current_week + 1}", callback_data=current_week + 1
+                        text=f"{current_week + 1}", callback_data=str(current_week + 1)
                     ),
                 ]
             ]
     else:
         current_week_button = []
 
-    reply_mark = InlineKeyboardMarkup(week_buttons + current_week_button + date_buttons)
+    reply_mark = InlineKeyboardMarkup(
+        inline_keyboard=week_buttons + current_week_button + date_buttons
+    )
 
     return reply_mark
 
@@ -103,8 +107,8 @@ def construct_workdays(week: int, schedule: ScheduleData, selected_date=None):
 
     lesson_dates = [lesson.dates for lesson in lessons]
 
-    button_rows = []
-    row = []
+    button_rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
 
     for i, date in enumerate(dates, start=1):
         sign = ""
@@ -131,15 +135,13 @@ def construct_workdays(week: int, schedule: ScheduleData, selected_date=None):
         )
 
         if len(row) == 3 or i == 6:
-            button_rows.append(tuple(row))
+            button_rows.append(row)
             row = []
 
     if lesson_dates:
-        button_rows.append(
-            (InlineKeyboardButton(text="На неделю", callback_data="week"),)
-        )
+        button_rows.append([InlineKeyboardButton(text="На неделю", callback_data="week")])
 
-    button_rows.append((InlineKeyboardButton(text="Назад", callback_data="back"),))
-    ready_markup = InlineKeyboardMarkup(button_rows)
+    button_rows.append([InlineKeyboardButton(text="Назад", callback_data="back")])
+    ready_markup = InlineKeyboardMarkup(inline_keyboard=button_rows)
 
     return ready_markup
