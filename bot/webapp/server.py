@@ -1,12 +1,14 @@
 import asyncio
 from datetime import date, datetime
 import os
+import re
 from typing import Annotated
+import uuid
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,7 +37,9 @@ class MaintenanceRequest(BaseModel):
 
 class BroadcastRequest(BaseModel):
     text: str
+    media_url: str | None = None
     image_url: str | None = None
+    media_type: str | None = None  # "image" | "video"
     button_text: str | None = None
     button_url: str | None = None
     test_only: bool = False
@@ -43,6 +47,7 @@ class BroadcastRequest(BaseModel):
 
 broadcast_state = {
     "is_running": False,
+
     "total": 0,
     "sent": 0,
     "failed": 0,
@@ -71,8 +76,11 @@ def create_webapp_app(
     )
 
     static_dir = os.path.join(os.path.dirname(__file__), "static")
+    uploads_dir = os.path.join(static_dir, "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
     if os.path.exists(static_dir):
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
     async def get_current_user(
         x_telegram_init_data: Annotated[str | None, Header()] = None,
@@ -294,6 +302,35 @@ def create_webapp_app(
             "maintenance_message": bot_data.get("maintenance_message") or "",
         }
 
+    @app.post("/api/admin/upload")
+    async def upload_admin_media(
+        request: Request,
+        filename: str = Query(...),
+        admin: dict = Depends(get_admin_user),
+    ):
+        body = await request.body()
+        if not body:
+            raise HTTPException(status_code=400, detail="Файл пустой")
+        if len(body) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Файл слишком большой (макс. 50 МБ)")
+
+        ext = os.path.splitext(filename)[1].lower()
+        clean_ext = ext if ext else ".jpg"
+        safe_name = f"{uuid.uuid4().hex[:10]}_{re.sub(r'[^a-zA-Z0-9_.-]', '', filename)}"
+        file_path = os.path.join(uploads_dir, safe_name)
+        with open(file_path, "wb") as f:
+            f.write(body)
+
+        is_vid = clean_ext in {".mp4", ".mov", ".avi", ".webm", ".mkv", ".m4v"}
+        rel_url = f"/static/uploads/{safe_name}"
+
+        return {
+            "status": "ok",
+            "url": rel_url,
+            "media_type": "video" if is_vid else "image",
+            "filename": filename,
+        }
+
     @app.get("/api/admin/broadcast/status")
     async def get_broadcast_status(admin: dict = Depends(get_admin_user)):
         return broadcast_state
@@ -318,26 +355,53 @@ def create_webapp_app(
                 ]
             )
 
+        media_val = (req.media_url or req.image_url or "").strip()
+        media_target = None
+        is_vid = False
+
+        if media_val:
+            if media_val.startswith("/static/uploads/"):
+                rel_path = media_val.replace("/static/", "", 1)
+                local_file = os.path.join(static_dir, rel_path)
+                if os.path.exists(local_file):
+                    media_target = FSInputFile(local_file)
+            if not media_target:
+                media_target = media_val
+
+            ext = os.path.splitext(media_val.split("?")[0])[1].lower()
+            is_vid = req.media_type == "video" or ext in {".mp4", ".mov", ".avi", ".webm", ".mkv", ".m4v"}
+
         admin_id = int(admin["id"])
+
+        async def _send_to(chat_id: int):
+            if is_vid:
+                await bot.send_video(
+                    chat_id=chat_id,
+                    video=media_target,
+                    caption=req.text.strip(),
+                    reply_markup=markup,
+                    parse_mode=ParseMode.HTML,
+                )
+            elif media_target:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=media_target,
+                    caption=req.text.strip(),
+                    reply_markup=markup,
+                    parse_mode=ParseMode.HTML,
+                )
+            else:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=req.text.strip(),
+                    reply_markup=markup,
+                    parse_mode=ParseMode.HTML,
+                )
 
         # Test sending only to admin
         if req.test_only:
             try:
-                if req.image_url and req.image_url.strip():
-                    await bot.send_photo(
-                        chat_id=admin_id,
-                        photo=req.image_url.strip(),
-                        caption=req.text.strip(),
-                        reply_markup=markup,
-                        parse_mode=ParseMode.HTML,
-                    )
-                else:
-                    await bot.send_message(
-                        chat_id=admin_id,
-                        text=req.text.strip(),
-                        reply_markup=markup,
-                        parse_mode=ParseMode.HTML,
-                    )
+                await _send_to(admin_id)
                 return {"status": "ok", "message": "Тестовое сообщение успешно отправлено в ваш чат с ботом!"}
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Ошибка отправки: {e}")
@@ -353,26 +417,9 @@ def create_webapp_app(
             user_ids = await user_service.get_all_user_ids()
             broadcast_state["total"] = len(user_ids)
 
-            img = req.image_url.strip() if req.image_url else None
-            txt = req.text.strip()
-
             for uid in user_ids:
                 try:
-                    if img:
-                        await bot.send_photo(
-                            chat_id=uid,
-                            photo=img,
-                            caption=txt,
-                            reply_markup=markup,
-                            parse_mode=ParseMode.HTML,
-                        )
-                    else:
-                        await bot.send_message(
-                            chat_id=uid,
-                            text=txt,
-                            reply_markup=markup,
-                            parse_mode=ParseMode.HTML,
-                        )
+                    await _send_to(uid)
                     broadcast_state["sent"] += 1
                 except Exception:
                     broadcast_state["failed"] += 1
@@ -385,4 +432,5 @@ def create_webapp_app(
         return {"status": "ok", "message": "Рассылка запущена в фоне!"}
 
     return app
+
 

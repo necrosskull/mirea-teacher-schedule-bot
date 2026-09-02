@@ -238,19 +238,47 @@
                 <textarea id="bcTextInput" class="admin-textarea" rows="4" placeholder="📢 Внимание! Важная новость для студентов..."></textarea>
               </div>
 
+              <!-- Media Attachment (File Upload or Direct URL) -->
               <div class="admin-field-group">
-                <label class="admin-field-label" for="bcImageInput">URL картинки (необязательно):</label>
-                <input type="text" id="bcImageInput" class="admin-input" placeholder="https://example.com/banner.jpg">
+                <label class="admin-field-label">Медиафайл (фото или видео):</label>
+                <div class="media-upload-container">
+                  <label for="bcFileInput" class="bc-file-upload-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span>Загрузить фото / видео с устройства</span>
+                  </label>
+                  <input type="file" id="bcFileInput" accept="image/*,video/*" style="display:none">
+                  <div id="bcUploadStatus" class="bc-upload-status hidden"></div>
+                </div>
+                <input type="text" id="bcMediaUrlInput" class="admin-input" placeholder="Или вставьте прямую ссылку (https://...)" style="margin-top: 6px;">
               </div>
 
-              <div class="admin-fields-row">
-                <div class="admin-field-group" style="flex: 1;">
-                  <label class="admin-field-label" for="bcBtnTextInput">Текст кнопки:</label>
-                  <input type="text" id="bcBtnTextInput" class="admin-input" placeholder="Перейти к новости">
+              <!-- Button configuration -->
+              <div class="admin-field-group">
+                <label class="admin-field-label" for="bcBtnTextInput">Текст инлайн-кнопки (опционально):</label>
+                <input type="text" id="bcBtnTextInput" class="admin-input" placeholder="Например: Открыть новость">
+              </div>
+
+              <div class="admin-field-group">
+                <label class="admin-field-label" for="bcBtnUrlInput">Ссылка кнопки:</label>
+                <input type="text" id="bcBtnUrlInput" class="admin-input" placeholder="https://t.me/...">
+              </div>
+
+              <!-- Telegram Live Preview -->
+              <div class="admin-section-heading" style="margin-top: 6px;">👁️ Предпросмотр (как в Telegram)</div>
+              <div class="tg-preview-container">
+                <div class="tg-message-bubble">
+                  <div id="tgPreviewMedia" class="tg-preview-media hidden"></div>
+                  <div id="tgPreviewText" class="tg-preview-text">Текст сообщения появится здесь...</div>
+                  <div class="tg-preview-meta">
+                    <span id="tgPreviewTime">12:00</span>
+                    <span class="tg-preview-checks">✓✓</span>
+                  </div>
                 </div>
-                <div class="admin-field-group" style="flex: 1;">
-                  <label class="admin-field-label" for="bcBtnUrlInput">URL ссылки:</label>
-                  <input type="text" id="bcBtnUrlInput" class="admin-input" placeholder="https://t.me/...">
+                <div id="tgPreviewBtnWrapper" class="tg-preview-btn-wrapper hidden">
+                  <div class="tg-inline-btn">
+                    <span id="tgPreviewBtnText">Кнопка</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                  </div>
                 </div>
               </div>
 
@@ -262,6 +290,7 @@
               <div id="bcAlert" class="admin-status-alert hidden"></div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

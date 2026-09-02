@@ -190,3 +190,33 @@ async def test_webapp_api_endpoints():
         assert maint_data["maintenance_mode"] is True
         assert maint_data["maintenance_message"] == "Технические работы"
 
+        # Upload tests
+        # Non-admin -> 403
+        r_upload_fail = await client.post(
+            "/api/admin/upload?filename=test.mp4&user_id=777",
+            content=b"fake video content",
+        )
+        assert r_upload_fail.status_code == 403
+
+        # Admin video upload -> 200 with media_type video
+        r_upload_video = await client.post(
+            "/api/admin/upload?filename=demo.mp4&user_id=999",
+            content=b"fake mp4 video bytes",
+        )
+        assert r_upload_video.status_code == 200
+        video_data = r_upload_video.json()
+        assert video_data["status"] == "ok"
+        assert video_data["media_type"] == "video"
+        assert "/static/uploads/" in video_data["url"]
+
+        # Admin image upload -> 200 with media_type image
+        r_upload_img = await client.post(
+            "/api/admin/upload?filename=banner.png&user_id=999",
+            content=b"fake png image bytes",
+        )
+        assert r_upload_img.status_code == 200
+        img_data = r_upload_img.json()
+        assert img_data["status"] == "ok"
+        assert img_data["media_type"] == "image"
+
+

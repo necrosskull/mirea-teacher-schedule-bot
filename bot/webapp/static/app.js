@@ -94,12 +94,20 @@
   const btnSaveMaintenanceEl = document.getElementById('btnSaveMaintenance');
   const maintAlertEl = document.getElementById('maintAlert');
   const bcTextInputEl = document.getElementById('bcTextInput');
-  const bcImageInputEl = document.getElementById('bcImageInput');
+  const bcFileInputEl = document.getElementById('bcFileInput');
+  const bcUploadStatusEl = document.getElementById('bcUploadStatus');
+  const bcMediaUrlInputEl = document.getElementById('bcMediaUrlInput');
   const bcBtnTextInputEl = document.getElementById('bcBtnTextInput');
   const bcBtnUrlInputEl = document.getElementById('bcBtnUrlInput');
+  const tgPreviewMediaEl = document.getElementById('tgPreviewMedia');
+  const tgPreviewTextEl = document.getElementById('tgPreviewText');
+  const tgPreviewTimeEl = document.getElementById('tgPreviewTime');
+  const tgPreviewBtnWrapperEl = document.getElementById('tgPreviewBtnWrapper');
+  const tgPreviewBtnTextEl = document.getElementById('tgPreviewBtnText');
   const btnBcTestEl = document.getElementById('btnBcTest');
   const btnBcSendAllEl = document.getElementById('btnBcSendAll');
   const bcAlertEl = document.getElementById('bcAlert');
+
 
   const toastEl = document.getElementById('toast');
 
@@ -1274,60 +1282,165 @@
 
   async function handleBroadcast(isTest) {
     const text = bcTextInputEl.value.trim();
-    if (!text) {
-      bcAlertEl.textContent = 'Пожалуйста, введите текст сообщения';
-      bcAlertEl.className = 'admin-status-alert error';
-      bcAlertEl.classList.remove('hidden');
-      return;
+    let currentUploadedMedia = null;
+
+    if (bcFileInputEl) {
+      bcFileInputEl.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        bcUploadStatusEl.classList.remove('hidden');
+        bcUploadStatusEl.innerHTML = `⏳ Загрузка «${file.name}»...`;
+
+        try {
+          const res = await fetch(`/api/admin/upload?filename=${encodeURIComponent(file.name)}&init_data=${encodeURIComponent(state.initData)}`, {
+            method: 'POST',
+            headers: {
+              'X-Telegram-Init-Data': state.initData,
+            },
+            body: file,
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Ошибка загрузки');
+          }
+
+          const data = await res.json();
+          currentUploadedMedia = data;
+          bcMediaUrlInputEl.value = data.url;
+          bcUploadStatusEl.innerHTML = `✅ ${data.media_type === 'video' ? 'Видео' : 'Фото'} прикреплено: <b>${data.filename}</b> <span style="cursor:pointer;margin-left:8px;color:#ff3b30;font-weight:bold;" id="bcRemoveMedia" title="Удалить">✕</span>`;
+
+          document.getElementById('bcRemoveMedia')?.addEventListener('click', () => {
+            currentUploadedMedia = null;
+            bcFileInputEl.value = '';
+            bcMediaUrlInputEl.value = '';
+            bcUploadStatusEl.classList.add('hidden');
+            updateTelegramPreview();
+          });
+
+          updateTelegramPreview();
+        } catch (err) {
+          bcUploadStatusEl.innerHTML = `❌ Ошибка: ${err.message}`;
+        }
+      });
     }
 
-    haptic('medium');
-    const payload = {
-      text,
-      image_url: bcImageInputEl.value.trim() || null,
-      button_text: bcBtnTextInputEl.value.trim() || null,
-      button_url: bcBtnUrlInputEl.value.trim() || null,
-      test_only: isTest,
-    };
+    function updateTelegramPreview() {
+      if (!tgPreviewTextEl) return;
 
-    try {
-      const res = await fetch(`/api/admin/broadcast?init_data=${encodeURIComponent(state.initData)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': state.initData,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        bcAlertEl.textContent = data.message || (isTest ? 'Тест отправлен вам в ЛС!' : 'Рассылка запущена!');
-        bcAlertEl.className = 'admin-status-alert success';
-        bcAlertEl.classList.remove('hidden');
-        if (!isTest) {
-          bcTextInputEl.value = '';
-          bcImageInputEl.value = '';
-          bcBtnTextInputEl.value = '';
-          bcBtnUrlInputEl.value = '';
+      // 1. Text
+      const rawText = bcTextInputEl.value.trim();
+      if (rawText) {
+        tgPreviewTextEl.innerHTML = rawText.replace(/\n/g, '<br>');
+      } else {
+        tgPreviewTextEl.textContent = 'Текст сообщения появится здесь...';
+      }
+
+      // 2. Time
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      tgPreviewTimeEl.textContent = `${hh}:${mm}`;
+
+      // 3. Media
+      const mediaUrl = bcMediaUrlInputEl.value.trim();
+      if (mediaUrl) {
+        tgPreviewMediaEl.classList.remove('hidden');
+        const isVid = (currentUploadedMedia?.media_type === 'video') || /\.(mp4|mov|avi|webm|mkv|m4v)(\?.*)?$/i.test(mediaUrl);
+        if (isVid) {
+          tgPreviewMediaEl.innerHTML = `<video src="${mediaUrl}" controls playsinline style="max-height:220px;width:100%;border-radius:10px;display:block;"></video>`;
+        } else {
+          tgPreviewMediaEl.innerHTML = `<img src="${mediaUrl}" alt="Медиа" style="max-height:220px;width:100%;border-radius:10px;object-fit:cover;display:block;" onerror="this.parentElement.classList.add('hidden')">`;
         }
       } else {
-        bcAlertEl.textContent = data.detail || 'Ошибка отправки рассылки';
+        tgPreviewMediaEl.classList.add('hidden');
+        tgPreviewMediaEl.innerHTML = '';
+      }
+
+      // 4. Inline button
+      const btnText = bcBtnTextInputEl.value.trim();
+      if (btnText) {
+        tgPreviewBtnWrapperEl.classList.remove('hidden');
+        tgPreviewBtnTextEl.textContent = btnText;
+      } else {
+        tgPreviewBtnWrapperEl.classList.add('hidden');
+      }
+    }
+
+    bcTextInputEl.addEventListener('input', updateTelegramPreview);
+    bcMediaUrlInputEl.addEventListener('input', () => {
+      currentUploadedMedia = null;
+      updateTelegramPreview();
+    });
+    bcBtnTextInputEl.addEventListener('input', updateTelegramPreview);
+    bcBtnUrlInputEl.addEventListener('input', updateTelegramPreview);
+
+    // Initial trigger
+    updateTelegramPreview();
+
+    async function handleBroadcast(isTest) {
+      const text = bcTextInputEl.value.trim();
+      if (!text) {
+        bcAlertEl.textContent = 'Пожалуйста, введите текст сообщения';
+        bcAlertEl.className = 'admin-status-alert error';
+        bcAlertEl.classList.remove('hidden');
+        return;
+      }
+
+      haptic('medium');
+      const mediaUrl = bcMediaUrlInputEl.value.trim();
+      const payload = {
+        text,
+        media_url: mediaUrl || null,
+        media_type: currentUploadedMedia?.media_type || (/\.(mp4|mov|avi|webm|mkv|m4v)(\?.*)?$/i.test(mediaUrl) ? 'video' : 'image'),
+        button_text: bcBtnTextInputEl.value.trim() || null,
+        button_url: bcBtnUrlInputEl.value.trim() || null,
+        test_only: isTest,
+      };
+
+      try {
+        const res = await fetch(`/api/admin/broadcast?init_data=${encodeURIComponent(state.initData)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': state.initData,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          bcAlertEl.textContent = data.message || (isTest ? 'Тест отправлен вам в ЛС!' : 'Рассылка запущена!');
+          bcAlertEl.className = 'admin-status-alert success';
+          bcAlertEl.classList.remove('hidden');
+          if (!isTest) {
+            bcTextInputEl.value = '';
+            bcMediaUrlInputEl.value = '';
+            bcBtnTextInputEl.value = '';
+            bcBtnUrlInputEl.value = '';
+            if (bcUploadStatusEl) bcUploadStatusEl.classList.add('hidden');
+            currentUploadedMedia = null;
+            updateTelegramPreview();
+          }
+        } else {
+          bcAlertEl.textContent = data.detail || 'Ошибка отправки рассылки';
+          bcAlertEl.className = 'admin-status-alert error';
+          bcAlertEl.classList.remove('hidden');
+        }
+      } catch (e) {
+        bcAlertEl.textContent = 'Ошибка сети при рассылке';
         bcAlertEl.className = 'admin-status-alert error';
         bcAlertEl.classList.remove('hidden');
       }
-    } catch (e) {
-      bcAlertEl.textContent = 'Ошибка сети при рассылке';
-      bcAlertEl.className = 'admin-status-alert error';
-      bcAlertEl.classList.remove('hidden');
     }
-  }
 
-  btnBcTestEl.addEventListener('click', () => handleBroadcast(true));
-  btnBcSendAllEl.addEventListener('click', () => {
-    if (confirm('Вы уверены, что хотите запустить рассылку ВСЕМ пользователям бота?')) {
-      handleBroadcast(false);
-    }
-  });
+    btnBcTestEl.addEventListener('click', () => handleBroadcast(true));
+    btnBcSendAllEl.addEventListener('click', () => {
+      if (confirm('Вы уверены, что хотите запустить рассылку ВСЕМ пользователям бота?')) {
+        handleBroadcast(false);
+      }
+    });
+
 
 
   // Live status ticker: recalculates progress bars and timers every 10 seconds without rebuilding DOM
