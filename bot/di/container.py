@@ -1,7 +1,7 @@
 from dishka import Provider, Scope, make_async_container, provide
 
 from bot.api_client import ScheduleApiClient
-from bot.repository import UserRepository, UserStateRepository
+from bot.repository import ScheduleCacheRepository, UserRepository, UserStateRepository
 from bot.service import NotificationService, ScheduleService, StateService, UserService
 
 
@@ -19,11 +19,23 @@ class AppProvider(Provider):
         return UserStateRepository()
 
     @provide(scope=Scope.APP)
+    def provide_schedule_cache_repository(self) -> ScheduleCacheRepository:
+        return ScheduleCacheRepository()
+
+    @provide(scope=Scope.APP)
     def provide_schedule_service(
         self,
         schedule_api_client: ScheduleApiClient,
+        schedule_cache_repository: ScheduleCacheRepository,
+        user_repository: UserRepository,
     ) -> ScheduleService:
-        return ScheduleService(schedule_api_client)
+        return ScheduleService(
+            schedule_api_client,
+            cache_repo=schedule_cache_repository,
+            user_repo=user_repository,
+        )
+
+
 
     @provide(scope=Scope.APP)
     def provide_user_service(

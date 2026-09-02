@@ -40,12 +40,16 @@ async def get_query_handler(
     :param context - CallbackContext класс API
     :return: int сигнатура следующего состояния
     """
-    if message.via_bot:
+    if message.via_bot or message.from_user is None:
+        return
+
+    if not fav and not message.text:
         return
 
     await user_service.ensure_user(message.from_user)
 
     persistent_data = await get_user_data(message.from_user.id)
+
     sessions = persistent_data.get("sessions", {})
     user_data = {}
 
@@ -330,6 +334,9 @@ async def favourite(
     user_service: FromDishka[UserService],
     schedule_service: FromDishka[ScheduleService],
 ):
+    if message.from_user is None:
+        return
+
     query = await user_service.get_favorite(message.from_user.id)
 
     if not query:
@@ -366,7 +373,11 @@ async def callback_dispatcher(
     callback: CallbackQuery,
     schedule_service: FromDishka[ScheduleService],
 ):
+    if callback.from_user is None:
+        return
+
     persistent_data = await get_user_data(callback.from_user.id)
+
     sessions = persistent_data.get("sessions", {})
 
     session_key = _session_key_from_callback(callback)

@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, field_validator
 
 
 class SearchItem(BaseModel):
@@ -28,10 +28,19 @@ class SearchResults(BaseModel):
 
 
 class Campus(BaseModel):
-    latitude: float | None = ""
-    longitude: float | None = ""
+    latitude: float | None = None
+    longitude: float | None = None
     name: str | None = ""
     short_name: str | None = ""
+
+    @field_validator("latitude", "longitude", mode="before")
+    def normalize_coords(cls, value):
+        if value in ("", None):
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
 
 
 class Classroom(BaseModel):
@@ -56,28 +65,54 @@ class LessonBells(BaseModel):
         return value
 
 
-def validate_dates(value: list[str]) -> list[date]:
-    return [datetime.strptime(date, "%d-%m-%Y").date() for date in set(value)]
+def validate_dates(value: list[str | date] | None) -> list[date]:
+    if not value:
+        return []
+    result = []
+    for item in set(value):
+        if isinstance(item, date):
+            result.append(item)
+        elif isinstance(item, str):
+            try:
+                result.append(datetime.strptime(item, "%d-%m-%Y").date())
+            except ValueError:
+                result.append(datetime.strptime(item, "%Y-%m-%d").date())
+    return sorted(result)
 
 
 Dates = Annotated[list[date], BeforeValidator(validate_dates)]
 
 
 class LessonSchedule(BaseModel):
-    classrooms: list[Classroom] | None = None
+    classrooms: list[Classroom] = Field(default_factory=list)
     dates: Dates | None = None
-    groups: list[str] | None = ""
+    groups: list[str] = Field(default_factory=list)
     lesson_bells: LessonBells
     lesson_type: str | None = ""
     subject: str | None = ""
-    teachers: list[Teacher] | None = None
+    teachers: list[Teacher] = Field(default_factory=list)
     type: str | None = ""
+
+    @field_validator("groups", mode="before")
+    def normalize_groups(cls, value):
+        if value in (None, ""):
+            return []
+        if isinstance(value, list):
+            return value
+        return [str(value)]
+
+    @field_validator("classrooms", "teachers", mode="before")
+    def normalize_lists(cls, value):
+        if value in (None, ""):
+            return []
+        return value
 
 
 class Holiday(BaseModel):
     dates: Dates | None = None
     title: str | None = ""
     type: str | None = ""
+
 
 
 class Lesson(LessonSchedule):

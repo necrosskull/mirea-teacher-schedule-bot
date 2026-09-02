@@ -1,6 +1,9 @@
+import time
+
 from aiogram.types import User
 
 from bot.db.sqlite import NotificationUser, execute, fetchall, fetchone
+
 from bot.fetch.models import SearchItem
 
 
@@ -166,3 +169,35 @@ class UserRepository:
 
     async def delete_user(self, user_id: int):
         await execute("DELETE FROM schedulebot WHERE id = ?", (user_id,))
+
+    async def record_item_request(
+        self, item_type: str, item_uid: int, item_name: str
+    ):
+        now = time.time()
+        await execute(
+            """
+            INSERT INTO item_requests (item_type, item_uid, item_name, request_count, last_requested_at)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(item_type, item_uid) DO UPDATE SET
+                request_count = request_count + 1,
+                item_name = excluded.item_name,
+                last_requested_at = excluded.last_requested_at
+            """,
+            (item_type, item_uid, item_name, now),
+        )
+
+    async def get_top_requested_items(
+        self, item_type: str, limit: int = 3
+    ) -> list[tuple[str, int]]:
+        rows = await fetchall(
+            """
+            SELECT item_name, request_count
+            FROM item_requests
+            WHERE item_type = ?
+            ORDER BY request_count DESC, last_requested_at DESC
+            LIMIT ?
+            """,
+            (item_type, limit),
+        )
+        return [(row[0], int(row[1])) for row in rows]
+

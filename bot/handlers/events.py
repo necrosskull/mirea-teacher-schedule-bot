@@ -3,6 +3,7 @@ import re
 
 from aiogram import Router
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka, inject
@@ -17,7 +18,10 @@ SEND_LINK_PATTERN = re.compile(r"\[\[([^\]|]{1,64})\|(https?://\S+)\]\]\s*$")
 
 
 def _is_admin(message: Message) -> bool:
+    if message.from_user is None:
+        return False
     return message.from_user.id in settings.admins
+
 
 
 def _extract_inline_link(text: str) -> tuple[str, InlineKeyboardMarkup | None]:
@@ -86,9 +90,21 @@ async def send_message_to_all_users(
                 reply_markup=reply_markup,
             )
             logger.lazy_logger.logger.info(f"Message sent to {user}")
-        except Exception as e:
-            logger.lazy_logger.logger.info(f"Error sending message to {user}: {e}")
+        except (TelegramForbiddenError, TelegramBadRequest) as e:
+            logger.lazy_logger.logger.info(f"User {user} unavailable ({e}), deleting")
             await user_service.delete_user(user)
+        except Exception as e:
+            logger.lazy_logger.logger.warning(f"Error sending message to {user}: {e}")
+
+
+
+def _format_top_items(items: list[tuple[str, int]]) -> str:
+    if not items:
+        return "  (нет данных)"
+    return "\n".join(
+        f"  {idx}. {name} — {count} зап."
+        for idx, (name, count) in enumerate(items, 1)
+    )
 
 
 @router.message(Command("stats"))
@@ -104,12 +120,25 @@ async def stats(
     with_favorite = await user_service.count_users_with_favorite()
     with_notifications = await user_service.count_users_with_notifications()
 
-    await message.answer(
-        "📊 Статистика пользователей:\n"
+    top_teachers = await user_service.get_top_requested_items("teacher", limit=3)
+    top_groups = await user_service.get_top_requested_items("group", limit=3)
+    top_classrooms = await user_service.get_top_requested_items("classroom", limit=3)
+
+    stats_text = (
+        "📊 Статистика бота:\n"
         f"👥 Всего пользователей: {all_users}\n"
-        f"⭐ С избранным расписанием: {with_favorite}\n"
-        f"🔔 С включенными напоминаниями: {with_notifications}"
+        f"⭐ С избранным: {with_favorite}\n"
+        f"🔔 С напоминаниями: {with_notifications}\n\n"
+        "👨‍🏫 Топ-3 преподавателей:\n"
+        f"{_format_top_items(top_teachers)}\n\n"
+        "👥 Топ-3 групп:\n"
+        f"{_format_top_items(top_groups)}\n\n"
+        "🏫 Топ-3 кабинетов:\n"
+        f"{_format_top_items(top_classrooms)}"
     )
+
+    await message.answer(stats_text)
+
 
 
 def init_handlers(dispatcher):

@@ -19,8 +19,11 @@ async def save_favourite(
     user_service: FromDishka[UserService],
 ):
     """
-    Привествие бота при использовании команды /start
+    Сохранение запроса в избранное
     """
+    if message.from_user is None:
+        return
+
     await user_service.ensure_user(message.from_user)
     await state.set_state(FavoriteStates.awaiting_favorite)
 
@@ -38,8 +41,14 @@ async def ask_favourite(
     state: FSMContext,
     user_service: FromDishka[UserService],
 ):
+    if message.from_user is None or not message.text:
+        return
+
+    await user_service.ensure_user(message.from_user)
     await user_service.set_favorite(message.from_user.id, message.text)
     await state.clear()
+
+
 
     query = await user_service.get_favorite(message.from_user.id)
     await message.answer(

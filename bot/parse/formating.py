@@ -26,6 +26,7 @@ def format_outputs(lessons: list[Lesson], user_data: dict):
         4: "Четверг",
         5: "Пятница",
         6: "Суббота",
+        7: "Воскресенье",
     }
 
     MONTHS = {
@@ -44,75 +45,93 @@ def format_outputs(lessons: list[Lesson], user_data: dict):
     }
 
     blocks = []
+    error_message = None
 
     for lesson in lessons:
-        error_message = None
-        week, weekday = get_week_and_weekday(lesson.dates)
-        match lesson.lesson_type.lower():
-            case "lecture":
-                lesson_type = "Лекция"
-            case "laboratorywork":
-                lesson_type = "Лабораторная"
-            case "practice":
-                lesson_type = "Практика"
-            case "individualwork":
-                lesson_type = "Сам. работа"
-            case "exam":
-                lesson_type = "Экзамен"
-            case "consultation":
-                lesson_type = "Консультация"
-            case "coursework":
-                lesson_type = "Курс. раб."
-            case "courseproject":
-                lesson_type = "Курс. проект"
-            case "credit":
-                lesson_type = "Зачет"
-            case _:
-                lesson_type = "Неизвестно"
-
-        formatted_time = (
-            f"{lesson.lesson_bells.start_time} – {lesson.lesson_bells.end_time}"
-        )
-
-        groups = ", ".join(lesson.groups)
-        teachers = ", ".join(teacher.name for teacher in lesson.teachers)
-        campus = (
-            f"({lesson.classrooms[0].campus.short_name})"
-            if lesson.classrooms and lesson.classrooms[0].campus
-            else ""
-        )
-        room = lesson.classrooms[0].name if lesson.classrooms else ""
-
         try:
+            week, weekday = get_week_and_weekday(lesson.dates)
+            raw_type = (lesson.lesson_type or "").lower()
+            match raw_type:
+                case "lecture":
+                    lesson_type = "Лекция"
+                case "laboratorywork":
+                    lesson_type = "Лабораторная"
+                case "practice":
+                    lesson_type = "Практика"
+                case "individualwork":
+                    lesson_type = "Сам. работа"
+                case "exam":
+                    lesson_type = "Экзамен"
+                case "consultation":
+                    lesson_type = "Консультация"
+                case "coursework":
+                    lesson_type = "Курс. раб."
+                case "courseproject":
+                    lesson_type = "Курс. проект"
+                case "credit":
+                    lesson_type = "Зачет"
+                case _:
+                    lesson_type = "Неизвестно"
+
+            formatted_time = (
+                f"{lesson.lesson_bells.start_time} – {lesson.lesson_bells.end_time}"
+            )
+
+            groups = ", ".join(lesson.groups) if lesson.groups else ""
+            teachers = (
+                ", ".join(teacher.name for teacher in lesson.teachers if teacher and teacher.name)
+                if lesson.teachers
+                else ""
+            )
+            campus = (
+                f"({lesson.classrooms[0].campus.short_name})"
+                if lesson.classrooms and lesson.classrooms[0].campus and lesson.classrooms[0].campus.short_name
+                else ""
+            )
+            room = (
+                lesson.classrooms[0].name
+                if lesson.classrooms and lesson.classrooms[0].name
+                else ""
+            )
+
+            weekday_name = WEEKDAYS.get(weekday, "Неизвестно")
+            month_name = MONTHS.get(lesson.dates.month, "")
+
             text += f"📝 Пара № {lesson.lesson_bells.number} в ⏰ {formatted_time}\n"
             text += f"📝 {lesson.subject}\n"
             text += f"📚 {lesson_type}\n"
             if len(groups) > 0:
                 text += f"👥 Группы: {groups}\n"
-            text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
-            text += f"🏫 Аудитории: {room} {campus}\n"
+            if len(teachers) > 0:
+                text += f"👨🏻‍🏫 Преподаватели: {teachers}\n"
+            if room or campus:
+                text += f"🏫 Аудитории: {room} {campus}".rstrip() + "\n"
             text += f"📅 Неделя: {week}\n"
-            text += f"🗓️ {lesson.dates.day} {MONTHS[lesson.dates.month]} ({WEEKDAYS[weekday]})\n\n"
+            text += f"🗓️ {lesson.dates.day} {month_name} ({weekday_name})\n\n"
 
             blocks.append(text)
             text = ""
 
         except Exception as e:
+            text = ""
+            item_raw = user_data.get("item") if isinstance(user_data, dict) else None
+            item_dump = (
+                item_raw.model_dump()
+                if hasattr(item_raw, "model_dump")
+                else str(item_raw)
+            )
             target_info = {
                 "type": "error",
-                "item": user_data["item"].model_dump(),
-                "week": week,
-                "weekday": weekday,
+                "item": item_dump,
                 "error": str(e),
             }
 
             if str(e) != error_message:
                 error_message = str(e)
                 lazy_logger.logger.error(json.dumps(target_info, ensure_ascii=False))
-                text = "Ошибка при получении расписания"
-                blocks.append(text)
-                text = ""
+                blocks.append("Ошибка при получении расписания")
 
-            return blocks
+            continue
 
     return blocks
+

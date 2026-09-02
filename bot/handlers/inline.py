@@ -34,10 +34,14 @@ async def handle_inline_query(
     Создает Inline отображение
     """
 
-    if bot_data["maintenance_mode"]:
+    if bot_data.get("maintenance_mode", False):
+        return
+
+    if inline_query.from_user is None:
         return
 
     if len(inline_query.query) > 2:
+
         logger.lazy_logger.logger.info(
             json.dumps(
                 {
@@ -124,10 +128,13 @@ async def answer_inline_handler(chosen_inline_result: ChosenInlineResult, state:
     В случае отработки события ChosenInlineHandler запоминает выбранного преподавателя
     и выставляет текущий шаг Inline запроса на ask_day
     """
-    if chosen_inline_result is not None:
-        type, uid, name = chosen_inline_result.result_id.split(":", 2)
+    if chosen_inline_result is not None and chosen_inline_result.from_user is not None:
+        parts = chosen_inline_result.result_id.split(":", 2)
+        if len(parts) != 3:
+            return
+        item_type, uid, name = parts
 
-        selected_item = SearchItem(type=type, uid=int(uid), name=name)
+        selected_item = SearchItem(type=item_type, uid=int(uid), name=name)
 
         persistent_data = await get_user_data(chosen_inline_result.from_user.id)
         inline_sessions = persistent_data.get("inline_sessions", {})
@@ -160,7 +167,11 @@ async def inline_dispatcher(
     """
     Обработка вызовов в чатах на основании Callback вызова
     """
+    if callback.from_user is None:
+        return
+
     persistent_data = await get_user_data(callback.from_user.id)
+
     inline_sessions = persistent_data.get("inline_sessions", {})
 
     if callback.inline_message_id not in inline_sessions:

@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from bot.fetch.models import SearchItem
+from bot.logs.lazy_logger import lazy_logger
 from bot.service import StateService
 
 bot_data: dict[str, Any] = {}
@@ -79,8 +80,8 @@ async def _save_user_data(user_id: int, user_data: dict[str, Any]):
             return
 
         await _state_service.save_payload(user_id, json.dumps(payload, ensure_ascii=False))
-    except Exception:
-        pass
+    except Exception as e:
+        lazy_logger.logger.warning(f"_save_user_data failed for user={user_id}: {e}")
 
 
 async def _load_user_data(user_id: int) -> dict[str, Any]:
@@ -94,8 +95,10 @@ async def _load_user_data(user_id: int) -> dict[str, Any]:
 
         raw_payload = json.loads(payload)
         return {k: _decode_value(v) for k, v in raw_payload.items()}
-    except Exception:
+    except Exception as e:
+        lazy_logger.logger.warning(f"_load_user_data failed for user={user_id}: {e}")
         return {}
+
 
 
 class PersistentUserData(dict):

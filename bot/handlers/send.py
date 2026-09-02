@@ -1,6 +1,7 @@
-from datetime import datetime
+import datetime as dt
 
 from aiogram import Bot
+
 from aiogram.types import CallbackQuery, Message
 
 from bot.fetch.models import SearchItem
@@ -142,20 +143,32 @@ async def send_result(
 ):
     schedule_data = user_data["schedule"]
 
-    date = user_data.get("date", None)
+    target_date = user_data.get("date", None)
     week = user_data.get("week", None)
 
     if week:
         week = int(week)
     else:
-        week, _ = get_week_and_weekday(date)
+        week, _ = get_week_and_weekday(target_date)
 
     dates_list = []
 
     if show_week:
         dates_list = get_dates_for_week(week)
+    elif isinstance(target_date, dt.datetime):
+        dates_list = [target_date.date()]
+    elif isinstance(target_date, dt.date):
+        dates_list = [target_date]
+    elif target_date:
+        try:
+            dates_list = [dt.datetime.strptime(str(target_date), "%Y-%m-%d").date()]
+        except ValueError:
+            dates_list = []
     else:
-        dates_list = [datetime.strptime(str(date), "%Y-%m-%d").date()]
+        dates_list = []
+
+
+
 
     lessons = get_lessons(schedule_data, dates_list)
 

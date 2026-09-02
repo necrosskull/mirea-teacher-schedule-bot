@@ -28,8 +28,7 @@ def construct_weeks_markup():
     week_indicator = "◖"
     week_indicator1 = "◗"
     today = datetime.date.today()
-
-    for day in ImportantDays.important_days:
+    for day in ImportantDays.get_important_days(today.year):
         if abs((day[ImportantDays.DATE] - today).days) <= day[ImportantDays.INTERVAL]:
             week_indicator = day[ImportantDays.SIGN]
             week_indicator1 = day[ImportantDays.SIGN]
@@ -68,20 +67,25 @@ def construct_weeks_markup():
                 ]
             ]
         else:
-            current_week_button = [
-                [
+            row = []
+            if current_week > 18:
+                row.append(
                     InlineKeyboardButton(
-                        text=f"{current_week - 1 if current_week > 18 else ''}",
+                        text=str(current_week - 1),
                         callback_data=str(current_week - 1),
-                    ),
-                    InlineKeyboardButton(
-                        text=f"◖{current_week}◗", callback_data=str(current_week)
-                    ),
-                    InlineKeyboardButton(
-                        text=f"{current_week + 1}", callback_data=str(current_week + 1)
-                    ),
-                ]
-            ]
+                    )
+                )
+            row.append(
+                InlineKeyboardButton(
+                    text=f"◖{current_week}◗", callback_data=str(current_week)
+                )
+            )
+            row.append(
+                InlineKeyboardButton(
+                    text=str(current_week + 1), callback_data=str(current_week + 1)
+                )
+            )
+            current_week_button = [row]
     else:
         current_week_button = []
 
@@ -110,18 +114,26 @@ def construct_workdays(week: int, schedule: ScheduleData, selected_date=None):
     button_rows: list[list[InlineKeyboardButton]] = []
     row: list[InlineKeyboardButton] = []
 
+    selected_d = None
+    if selected_date:
+        try:
+            selected_d = (
+                selected_date
+                if isinstance(selected_date, datetime.date)
+                else datetime.datetime.strptime(str(selected_date), "%Y-%m-%d").date()
+            )
+        except (ValueError, TypeError):
+            selected_d = None
+
     for i, date in enumerate(dates, start=1):
         sign = ""
         sign1 = ""
         callback = str(date)
 
-        if (
-            selected_date
-            and date
-            == datetime.datetime.strptime(str(selected_date), "%Y-%m-%d").date()
-        ):
+        if selected_d and date == selected_d:
             sign = "◖"
             sign1 = "◗"
+
 
         if date not in lesson_dates:
             sign = "⛔"

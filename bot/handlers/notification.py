@@ -17,6 +17,12 @@ from bot.logs.lazy_logger import lazy_logger
 from bot.parse.formating import format_outputs
 from bot.service import NotificationService, ScheduleService, UserService
 
+try:
+    from zoneinfo import ZoneInfo
+    MSK_TZ = ZoneInfo("Europe/Moscow")
+except Exception:
+    MSK_TZ = datetime.timezone(datetime.timedelta(hours=3))
+
 router = Router()
 
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
@@ -55,7 +61,9 @@ async def _send_blocks(bot, chat_id: int, header: str, blocks: list[str]):
 
 
 def _get_current_msk_time() -> datetime.datetime:
-    return datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=3)
+    return datetime.datetime.now(MSK_TZ)
+
+
 
 
 async def _mark_notification_sent(
@@ -365,43 +373,50 @@ async def notification_worker(
     semaphore = asyncio.Semaphore(NOTIFY_CONCURRENCY)
 
     while True:
-        started_at = _get_current_msk_time()
-        delivery_date = started_at.date().isoformat()
-        current_time = started_at.strftime("%H:%M")
+        try:
+            started_at = _get_current_msk_time()
+            delivery_date = started_at.date().isoformat()
+            current_time = started_at.strftime("%H:%M")
 
-        users = await notification_service.get_due_notification_users(
-            current_time, delivery_date
-        )
-        if users:
-            lazy_logger.logger.info(
-                f"notification_worker tick {current_time}: {len(users)} user(s) due"
+            users = await notification_service.get_due_notification_users(
+                current_time, delivery_date
             )
-
-            tasks = [
-                asyncio.create_task(
-                    _process_notification_user(
-                        user,
-                        bot=bot,
-                        notification_service=notification_service,
-                        schedule_service=schedule_service,
-                        delivery_date=delivery_date,
-                        now=started_at,
-                        semaphore=semaphore,
-                    )
+            if users:
+                lazy_logger.logger.info(
+                    f"notification_worker tick {current_time}: {len(users)} user(s) due"
                 )
-                for user in users
-            ]
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for user, result in zip(users, results):
-                if isinstance(result, Exception):
-                    lazy_logger.logger.exception(
-                        f"notification_worker gathered task failed for user={user.id}: {result}"
+                tasks = [
+                    asyncio.create_task(
+                        _process_notification_user(
+                            user,
+                            bot=bot,
+                            notification_service=notification_service,
+                            schedule_service=schedule_service,
+                            delivery_date=delivery_date,
+                            now=started_at,
+                            semaphore=semaphore,
+                        )
                     )
+                    for user in users
+                ]
 
-        finished_at = _get_current_msk_time()
-        elapsed = (finished_at - started_at).total_seconds()
-        await asyncio.sleep(max(1, NOTIFY_POLL_INTERVAL_SECONDS - elapsed))
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for user, result in zip(users, results):
+                    if isinstance(result, Exception):
+                        lazy_logger.logger.exception(
+                            f"notification_worker gathered task failed for user={user.id}: {result}"
+                        )
+
+            finished_at = _get_current_msk_time()
+            elapsed = (finished_at - started_at).total_seconds()
+            await asyncio.sleep(max(1, NOTIFY_POLL_INTERVAL_SECONDS - elapsed))
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            lazy_logger.logger.exception(f"notification_worker unexpected loop error: {e}")
+            await asyncio.sleep(NOTIFY_POLL_INTERVAL_SECONDS)
+
 
 
 def init_handlers(dispatcher):

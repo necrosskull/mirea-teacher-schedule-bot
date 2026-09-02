@@ -3,7 +3,13 @@ from dataclasses import dataclass
 
 import aiosqlite
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data/bot.db")
+from bot.config import settings
+
+DB_PATH = settings.db_path
+
+
+def get_db_path() -> str:
+    return settings.db_path
 
 
 @dataclass
@@ -14,8 +20,14 @@ class NotificationUser:
     notify_name: str | None
 
 
-async def init_db():
-    async with aiosqlite.connect(DB_PATH) as conn:
+async def init_db(db_path: str | None = None):
+    path = db_path or get_db_path()
+    db_dir = os.path.dirname(path)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    async with aiosqlite.connect(path) as conn:
+
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS schedulebot (
@@ -67,27 +79,67 @@ async def init_db():
             """
         )
 
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schedule_cache (
+                cache_key TEXT PRIMARY KEY,
+                payload TEXT NOT NULL,
+                updated_at REAL NOT NULL,
+                expires_at REAL NOT NULL
+            )
+            """
+        )
+
+        await conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_schedule_cache_expires
+            ON schedule_cache (expires_at)
+            """
+        )
+
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS item_requests (
+                item_type TEXT NOT NULL,
+                item_uid INTEGER NOT NULL,
+                item_name TEXT NOT NULL,
+                request_count INTEGER DEFAULT 1,
+                last_requested_at REAL NOT NULL,
+                PRIMARY KEY (item_type, item_uid)
+            )
+            """
+        )
+
+        await conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_item_requests_ranking
+            ON item_requests (item_type, request_count DESC)
+            """
+        )
+
         await conn.commit()
 
 
+
 async def fetchall(query: str, params: tuple = ()) -> list[aiosqlite.Row]:
-    async with aiosqlite.connect(DB_PATH) as conn:
+    async with aiosqlite.connect(get_db_path()) as conn:
         conn.row_factory = aiosqlite.Row
         cursor = await conn.execute(query, params)
         return await cursor.fetchall()
 
 
 async def fetchone(query: str, params: tuple = ()) -> aiosqlite.Row | None:
-    async with aiosqlite.connect(DB_PATH) as conn:
+    async with aiosqlite.connect(get_db_path()) as conn:
         conn.row_factory = aiosqlite.Row
         cursor = await conn.execute(query, params)
         return await cursor.fetchone()
 
 
 async def execute(query: str, params: tuple = ()):
-    async with aiosqlite.connect(DB_PATH) as conn:
+    async with aiosqlite.connect(get_db_path()) as conn:
         await conn.execute(query, params)
         await conn.commit()
+
 
 
 async def upsert_user_state(user_id: int, payload: str):
