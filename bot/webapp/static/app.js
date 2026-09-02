@@ -1191,9 +1191,14 @@
 
   btnAdminEl.addEventListener('click', openAdminModal);
   adminBtnCloseEl.addEventListener('click', closeAdminModal);
+  const adminOverlayEl = document.getElementById('adminOverlay');
+  if (adminOverlayEl) {
+    adminOverlayEl.addEventListener('click', closeAdminModal);
+  }
   adminModalEl.addEventListener('click', (e) => {
     if (e.target === adminModalEl) closeAdminModal();
   });
+
 
   async function loadAdminStats() {
     try {

@@ -67,8 +67,10 @@ body {
 .header-left {
   display: flex;
   align-items: center;
+  gap: 6px;
   flex-shrink: 0;
 }
+
 
 .header-center {
   flex: 1;
@@ -443,8 +445,13 @@ body {
 }
 
 .modal.hidden {
-  display: none;
+  display: none !important;
 }
+
+.hidden {
+  display: none !important;
+}
+
 
 .modal-overlay {
   position: absolute;
@@ -1056,14 +1063,14 @@ body {
   transform: scale(0.92);
 }
 
-.admin-modal-card {
-  max-width: 500px;
-  max-height: 88vh;
+.admin-modal-content {
+  max-height: 85vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   padding: 16px 20px 24px;
 }
+
 
 .admin-modal-header {
   display: flex;
