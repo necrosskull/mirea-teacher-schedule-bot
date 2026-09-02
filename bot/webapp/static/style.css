@@ -1037,3 +1037,369 @@ body {
   border: 1px solid var(--card-border);
 }
 
+/* ==========================================================================
+   Admin Panel & Management Dashboard
+   ========================================================================== */
+.admin-btn {
+  font-size: 17px;
+  background: rgba(255, 184, 0, 0.15);
+  border: 1px solid rgba(255, 184, 0, 0.4);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition), background-color var(--transition);
+}
+
+.admin-btn:active {
+  transform: scale(0.92);
+}
+
+.admin-modal-card {
+  max-width: 500px;
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 24px;
+}
+
+.admin-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.admin-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-badge {
+  background: linear-gradient(135deg, #ff9500, #ff3b30);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+.admin-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Tabs */
+.admin-tabs {
+  display: flex;
+  background: var(--bg-color);
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.admin-tab-btn {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--hint-color);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.admin-tab-btn.active {
+  background: var(--secondary-bg-color);
+  color: var(--text-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Views */
+.admin-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-view.hidden {
+  display: none;
+}
+
+/* Metrics Grid */
+.admin-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.metric-card {
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--button-color);
+}
+
+.metric-label {
+  font-size: 10px;
+  color: var(--hint-color);
+  font-weight: 500;
+}
+
+.admin-section-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hint-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.top-lists-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top-list-col {
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.top-list-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-color);
+  margin-bottom: 8px;
+}
+
+.top-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.top-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.top-item-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+
+.top-item-count {
+  background: var(--secondary-bg-color);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  color: var(--button-color);
+  border: 1px solid var(--card-border);
+}
+
+.top-empty {
+  font-size: 12px;
+  color: var(--hint-color);
+  font-style: italic;
+}
+
+/* Maintenance Card */
+.admin-card-section {
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.maint-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.maint-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.maint-desc {
+  font-size: 11px;
+  color: var(--hint-color);
+  margin-top: 2px;
+}
+
+/* iOS/Telegram Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #78788029;
+  transition: 0.3s;
+  border-radius: 28px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+input:checked + .slider {
+  background-color: #34c759;
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+/* Admin Form Elements */
+.admin-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hint-color);
+}
+
+.admin-input,
+.admin-textarea {
+  background: var(--secondary-bg-color);
+  border: 1px solid var(--card-border);
+  color: var(--text-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.admin-input:focus,
+.admin-textarea:focus {
+  border-color: var(--button-color);
+}
+
+.admin-fields-row {
+  display: flex;
+  gap: 10px;
+}
+
+.admin-save-btn,
+.bc-btn-send {
+  background: var(--button-color);
+  color: var(--button-text-color);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.admin-save-btn:active,
+.bc-btn-send:active,
+.bc-btn-test:active {
+  transform: scale(0.98);
+}
+
+.bc-buttons-row {
+  display: flex;
+  gap: 10px;
+}
+
+.bc-btn-test {
+  flex: 1;
+  background: var(--secondary-bg-color);
+  border: 1px solid var(--card-border);
+  color: var(--text-color);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bc-btn-send {
+  flex: 1.3;
+}
+
+.admin-status-alert {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-status-alert.success {
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
+  border: 1px solid rgba(52, 199, 89, 0.3);
+}
+
+.admin-status-alert.error {
+  background: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+  border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+

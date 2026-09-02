@@ -23,7 +23,9 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
         </button>
+        <button id="btnAdmin" class="icon-btn admin-btn hidden" aria-label="Админ-панель" title="Панель администратора">👑</button>
       </div>
+
 
       <div class="header-center">
         <h1 id="entityTitle" class="entity-title">Загрузка...</h1>
@@ -143,8 +145,128 @@
       </div>
     </div>
 
+    <!-- Admin Dashboard Modal -->
+    <div id="adminModal" class="modal-overlay hidden">
+      <div class="modal-card admin-modal-card">
+        <div class="modal-handle"></div>
+        <div class="admin-modal-header">
+          <div class="admin-title-row">
+            <span class="admin-badge">ADMIN</span>
+            <h2 class="admin-modal-title">Панель управления</h2>
+          </div>
+          <button id="adminBtnClose" class="close-btn">&times;</button>
+        </div>
+
+        <div class="admin-tabs">
+          <button id="tabBtnStats" class="admin-tab-btn active">📊 Статистика</button>
+          <button id="tabBtnMaintenance" class="admin-tab-btn">🛠️ Обслуживание</button>
+          <button id="tabBtnBroadcast" class="admin-tab-btn">📢 Рассылка</button>
+        </div>
+
+        <div class="admin-modal-body">
+          <!-- 1. Stats View -->
+          <div id="adminViewStats" class="admin-view active">
+            <div class="admin-metrics-grid">
+              <div class="metric-card">
+                <div class="metric-num" id="statTotalUsers">0</div>
+                <div class="metric-label">👥 Всего пользователей</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-num" id="statFavUsers">0</div>
+                <div class="metric-label">⭐ С избранным</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-num" id="statNotifyUsers">0</div>
+                <div class="metric-label">🔔 Уведомления</div>
+              </div>
+            </div>
+
+            <div class="admin-section-heading">🔥 Топ-5 частых запросов</div>
+            <div class="top-lists-grid">
+              <div class="top-list-col">
+                <div class="top-list-title">👥 Группы</div>
+                <div id="topGroupsList" class="top-items-list">
+                  <div class="top-empty">Нет данных</div>
+                </div>
+              </div>
+              <div class="top-list-col">
+                <div class="top-list-title">🧑‍🏫 Преподаватели</div>
+                <div id="topTeachersList" class="top-items-list">
+                  <div class="top-empty">Нет данных</div>
+                </div>
+              </div>
+              <div class="top-list-col">
+                <div class="top-list-title">🏫 Аудитории</div>
+                <div id="topClassroomsList" class="top-items-list">
+                  <div class="top-empty">Нет данных</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Maintenance View -->
+          <div id="adminViewMaintenance" class="admin-view hidden">
+            <div class="admin-card-section">
+              <div class="maint-toggle-row">
+                <div class="maint-toggle-info">
+                  <div class="maint-title">Режим техобслуживания</div>
+                  <div class="maint-desc">Блокирует запросы к боту для пользователей, кроме админов</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="maintSwitch">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="admin-field-group">
+                <label class="admin-field-label" for="maintMessageInput">Текст сообщения при обслуживании:</label>
+                <textarea id="maintMessageInput" class="admin-textarea" rows="3" placeholder="🛠️ Ведутся технические работы. Бот скоро вернётся к работе..."></textarea>
+              </div>
+
+              <button id="btnSaveMaintenance" class="admin-save-btn">💾 Сохранить статус</button>
+              <div id="maintAlert" class="admin-status-alert hidden"></div>
+            </div>
+          </div>
+
+          <!-- 3. Broadcast View -->
+          <div id="adminViewBroadcast" class="admin-view hidden">
+            <div class="admin-card-section">
+              <div class="admin-field-group">
+                <label class="admin-field-label" for="bcTextInput">Текст рассылки (поддерживает HTML):</label>
+                <textarea id="bcTextInput" class="admin-textarea" rows="4" placeholder="📢 Внимание! Важная новость для студентов..."></textarea>
+              </div>
+
+              <div class="admin-field-group">
+                <label class="admin-field-label" for="bcImageInput">URL картинки (необязательно):</label>
+                <input type="text" id="bcImageInput" class="admin-input" placeholder="https://example.com/banner.jpg">
+              </div>
+
+              <div class="admin-fields-row">
+                <div class="admin-field-group" style="flex: 1;">
+                  <label class="admin-field-label" for="bcBtnTextInput">Текст кнопки:</label>
+                  <input type="text" id="bcBtnTextInput" class="admin-input" placeholder="Перейти к новости">
+                </div>
+                <div class="admin-field-group" style="flex: 1;">
+                  <label class="admin-field-label" for="bcBtnUrlInput">URL ссылки:</label>
+                  <input type="text" id="bcBtnUrlInput" class="admin-input" placeholder="https://t.me/...">
+                </div>
+              </div>
+
+              <div class="bc-buttons-row">
+                <button id="btnBcTest" class="bc-btn-test">🧪 Тест мне в ЛС</button>
+                <button id="btnBcSendAll" class="bc-btn-send">🚀 Разослать всем</button>
+              </div>
+
+              <div id="bcAlert" class="admin-status-alert hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden"></div>
+
   </div>
 
   <script src="/static/app.js"></script>

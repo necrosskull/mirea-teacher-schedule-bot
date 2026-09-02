@@ -73,7 +73,36 @@
   const calBtnTodayEl = document.getElementById('calBtnToday');
   const calBtnCloseEl = document.getElementById('calBtnClose');
 
+  // Admin Modal
+  const btnAdminEl = document.getElementById('btnAdmin');
+  const adminModalEl = document.getElementById('adminModal');
+  const adminBtnCloseEl = document.getElementById('adminBtnClose');
+  const tabBtnStats = document.getElementById('tabBtnStats');
+  const tabBtnMaintenance = document.getElementById('tabBtnMaintenance');
+  const tabBtnBroadcast = document.getElementById('tabBtnBroadcast');
+  const adminViewStats = document.getElementById('adminViewStats');
+  const adminViewMaintenance = document.getElementById('adminViewMaintenance');
+  const adminViewBroadcast = document.getElementById('adminViewBroadcast');
+  const statTotalUsersEl = document.getElementById('statTotalUsers');
+  const statFavUsersEl = document.getElementById('statFavUsers');
+  const statNotifyUsersEl = document.getElementById('statNotifyUsers');
+  const topGroupsListEl = document.getElementById('topGroupsList');
+  const topTeachersListEl = document.getElementById('topTeachersList');
+  const topClassroomsListEl = document.getElementById('topClassroomsList');
+  const maintSwitchEl = document.getElementById('maintSwitch');
+  const maintMessageInputEl = document.getElementById('maintMessageInput');
+  const btnSaveMaintenanceEl = document.getElementById('btnSaveMaintenance');
+  const maintAlertEl = document.getElementById('maintAlert');
+  const bcTextInputEl = document.getElementById('bcTextInput');
+  const bcImageInputEl = document.getElementById('bcImageInput');
+  const bcBtnTextInputEl = document.getElementById('bcBtnTextInput');
+  const bcBtnUrlInputEl = document.getElementById('bcBtnUrlInput');
+  const btnBcTestEl = document.getElementById('btnBcTest');
+  const btnBcSendAllEl = document.getElementById('btnBcSendAll');
+  const bcAlertEl = document.getElementById('bcAlert');
+
   const toastEl = document.getElementById('toast');
+
 
   function showToast(text) {
     toastEl.textContent = text;
@@ -647,7 +676,10 @@
       }
 
       const query = new URLSearchParams(params);
-      const res = await fetch(`/api/schedule?${query.toString()}`);
+      const res = await fetch(`/api/schedule?${query.toString()}`, {
+        headers: { 'X-Telegram-Init-Data': state.initData },
+      });
+
       if (!res.ok) throw new Error('Ошибка сети');
 
       const data = await res.json();
@@ -980,8 +1012,12 @@
 
     searchTimeout = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(
+          `/api/search?q=${encodeURIComponent(query)}&init_data=${encodeURIComponent(state.initData)}`,
+          { headers: { 'X-Telegram-Init-Data': state.initData } }
+        );
         if (!res.ok) throw new Error();
+
         const items = await res.json();
 
         if (!items || items.length === 0) {
@@ -1111,6 +1147,9 @@
       const meRes = await fetch(`/api/me?init_data=${encodeURIComponent(state.initData)}`);
       if (meRes.ok) {
         state.user = await meRes.json();
+        if (state.user?.is_admin) {
+          btnAdminEl.classList.remove('hidden');
+        }
         if (state.user.favorite_item) {
           const todayISO = getLocalDateISO();
           await loadSchedule(state.user.favorite_item, null, todayISO);
@@ -1123,6 +1162,168 @@
       openSearch();
     }
   }
+
+  // ==================== ADMIN PANEL LOGIC ====================
+  function switchAdminTab(activeTabBtn, activeView) {
+    [tabBtnStats, tabBtnMaintenance, tabBtnBroadcast].forEach((b) => b.classList.remove('active'));
+    [adminViewStats, adminViewMaintenance, adminViewBroadcast].forEach((v) => {
+      v.classList.remove('active');
+      v.classList.add('hidden');
+    });
+    activeTabBtn.classList.add('active');
+    activeView.classList.remove('hidden');
+    activeView.classList.add('active');
+  }
+
+  tabBtnStats.addEventListener('click', () => switchAdminTab(tabBtnStats, adminViewStats));
+  tabBtnMaintenance.addEventListener('click', () => switchAdminTab(tabBtnMaintenance, adminViewMaintenance));
+  tabBtnBroadcast.addEventListener('click', () => switchAdminTab(tabBtnBroadcast, adminViewBroadcast));
+
+  function openAdminModal() {
+    haptic('medium');
+    adminModalEl.classList.remove('hidden');
+    loadAdminStats();
+  }
+
+  function closeAdminModal() {
+    adminModalEl.classList.add('hidden');
+  }
+
+  btnAdminEl.addEventListener('click', openAdminModal);
+  adminBtnCloseEl.addEventListener('click', closeAdminModal);
+  adminModalEl.addEventListener('click', (e) => {
+    if (e.target === adminModalEl) closeAdminModal();
+  });
+
+  async function loadAdminStats() {
+    try {
+      const res = await fetch(`/api/admin/stats?init_data=${encodeURIComponent(state.initData)}`, {
+        headers: { 'X-Telegram-Init-Data': state.initData },
+      });
+      if (!res.ok) {
+        if (res.status === 403) showToast('⛔ Доступ запрещён (не админ)');
+        return;
+      }
+      const data = await res.json();
+      statTotalUsersEl.textContent = data.total_users ?? 0;
+      statFavUsersEl.textContent = data.users_with_favorite ?? 0;
+      statNotifyUsersEl.textContent = data.users_with_notifications ?? 0;
+
+      const renderTop = (el, items) => {
+        if (!items || items.length === 0) {
+          el.innerHTML = '<div class="top-empty">Нет данных</div>';
+          return;
+        }
+        el.innerHTML = items
+          .map(
+            (it) => `
+          <div class="top-item-row">
+            <span class="top-item-name">${it.name}</span>
+            <span class="top-item-count">${it.count}</span>
+          </div>
+        `
+          )
+          .join('');
+      };
+
+      renderTop(topGroupsListEl, data.top_groups);
+      renderTop(topTeachersListEl, data.top_teachers);
+      renderTop(topClassroomsListEl, data.top_classrooms);
+
+      maintSwitchEl.checked = Boolean(data.maintenance_mode);
+      maintMessageInputEl.value = data.maintenance_message || '';
+    } catch (e) {
+      showToast('Ошибка загрузки админ-статистики');
+    }
+  }
+
+  btnSaveMaintenanceEl.addEventListener('click', async () => {
+    haptic('medium');
+    try {
+      const payload = {
+        enabled: maintSwitchEl.checked,
+        message: maintMessageInputEl.value.trim() || null,
+      };
+      const res = await fetch(`/api/admin/maintenance?init_data=${encodeURIComponent(state.initData)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': state.initData,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        maintAlertEl.textContent = '✅ Статус техобслуживания сохранён!';
+        maintAlertEl.className = 'admin-status-alert success';
+        maintAlertEl.classList.remove('hidden');
+        setTimeout(() => maintAlertEl.classList.add('hidden'), 3500);
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      maintAlertEl.textContent = '❌ Ошибка сохранения статуса';
+      maintAlertEl.className = 'admin-status-alert error';
+      maintAlertEl.classList.remove('hidden');
+    }
+  });
+
+  async function handleBroadcast(isTest) {
+    const text = bcTextInputEl.value.trim();
+    if (!text) {
+      bcAlertEl.textContent = 'Пожалуйста, введите текст сообщения';
+      bcAlertEl.className = 'admin-status-alert error';
+      bcAlertEl.classList.remove('hidden');
+      return;
+    }
+
+    haptic('medium');
+    const payload = {
+      text,
+      image_url: bcImageInputEl.value.trim() || null,
+      button_text: bcBtnTextInputEl.value.trim() || null,
+      button_url: bcBtnUrlInputEl.value.trim() || null,
+      test_only: isTest,
+    };
+
+    try {
+      const res = await fetch(`/api/admin/broadcast?init_data=${encodeURIComponent(state.initData)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': state.initData,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        bcAlertEl.textContent = data.message || (isTest ? 'Тест отправлен вам в ЛС!' : 'Рассылка запущена!');
+        bcAlertEl.className = 'admin-status-alert success';
+        bcAlertEl.classList.remove('hidden');
+        if (!isTest) {
+          bcTextInputEl.value = '';
+          bcImageInputEl.value = '';
+          bcBtnTextInputEl.value = '';
+          bcBtnUrlInputEl.value = '';
+        }
+      } else {
+        bcAlertEl.textContent = data.detail || 'Ошибка отправки рассылки';
+        bcAlertEl.className = 'admin-status-alert error';
+        bcAlertEl.classList.remove('hidden');
+      }
+    } catch (e) {
+      bcAlertEl.textContent = 'Ошибка сети при рассылке';
+      bcAlertEl.className = 'admin-status-alert error';
+      bcAlertEl.classList.remove('hidden');
+    }
+  }
+
+  btnBcTestEl.addEventListener('click', () => handleBroadcast(true));
+  btnBcSendAllEl.addEventListener('click', () => {
+    if (confirm('Вы уверены, что хотите запустить рассылку ВСЕМ пользователям бота?')) {
+      handleBroadcast(false);
+    }
+  });
+
 
   // Live status ticker: recalculates progress bars and timers every 10 seconds without rebuilding DOM
   setInterval(() => {

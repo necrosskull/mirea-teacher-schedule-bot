@@ -67,7 +67,7 @@ async def run() -> None:
     from bot.webapp import create_webapp_app
     import uvicorn
 
-    webapp_app = create_webapp_app(schedule_service, user_service)
+    webapp_app = create_webapp_app(schedule_service, user_service, bot=bot)
     server_config = uvicorn.Config(
         app=webapp_app,
         host=settings.webapp_host,
