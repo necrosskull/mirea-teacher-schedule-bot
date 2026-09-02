@@ -53,9 +53,10 @@
   const dayRibbonEl = document.getElementById('dayRibbon');
   const scheduleSliderEl = document.getElementById('scheduleSlider');
   const swipeAreaEl = document.getElementById('swipeArea');
-  const nextLessonBannerEl = document.getElementById('nextLessonBanner');
+  const liveDayWidgetEl = document.getElementById('liveDayWidget');
 
   // Search Modal
+
   const searchModalEl = document.getElementById('searchModal');
   const searchOverlayEl = document.getElementById('searchOverlay');
   const searchInputEl = document.getElementById('searchInput');
@@ -143,21 +144,27 @@
     renderLessons(direction);
   }
 
+  function getLessonTimes(startTimeStr, endTimeStr) {
+    const now = new Date();
+    const [sh, sm] = (startTimeStr || '00:00').split(':').map(Number);
+    const [eh, em] = (endTimeStr || '00:00').split(':').map(Number);
+
+    const start = new Date(now);
+    start.setHours(sh, sm, 0, 0);
+
+    const end = new Date(now);
+    end.setHours(eh, em, 0, 0);
+
+    return { start, end, now };
+  }
+
   function isLessonNow(startTimeStr, endTimeStr, lessonDateStr) {
     try {
       const now = new Date();
       const todayISO = now.toISOString().split('T')[0];
       if (lessonDateStr && lessonDateStr !== todayISO) return false;
 
-      const [sh, sm] = startTimeStr.split(':').map(Number);
-      const [eh, em] = endTimeStr.split(':').map(Number);
-
-      const start = new Date(now);
-      start.setHours(sh, sm, 0, 0);
-
-      const end = new Date(now);
-      end.setHours(eh, em, 0, 0);
-
+      const { start, end } = getLessonTimes(startTimeStr, endTimeStr);
       return now >= start && now <= end;
     } catch (e) {
       return false;
@@ -166,10 +173,7 @@
 
   function getRemainingMinutes(endTimeStr) {
     try {
-      const now = new Date();
-      const [eh, em] = endTimeStr.split(':').map(Number);
-      const end = new Date(now);
-      end.setHours(eh, em, 0, 0);
+      const { end, now } = getLessonTimes('00:00', endTimeStr);
       const diffMs = end - now;
       return Math.max(1, Math.round(diffMs / 60000));
     } catch (e) {
@@ -179,10 +183,7 @@
 
   function getMinutesUntilStart(startTimeStr) {
     try {
-      const now = new Date();
-      const [sh, sm] = startTimeStr.split(':').map(Number);
-      const start = new Date(now);
-      start.setHours(sh, sm, 0, 0);
+      const { start, now } = getLessonTimes(startTimeStr, '23:59');
       const diffMs = start - now;
       return Math.round(diffMs / 60000);
     } catch (e) {
@@ -250,33 +251,150 @@
     }
   }
 
-  function updateNextLessonBanner(lessons, currentDateStr) {
+  function updateLiveDayWidget(rawLessons, currentDateStr) {
     const todayISO = new Date().toISOString().split('T')[0];
-    if (currentDateStr !== todayISO || !lessons || lessons.length === 0) {
-      nextLessonBannerEl.classList.add('hidden');
+    if (currentDateStr !== todayISO || !rawLessons || rawLessons.length === 0) {
+      liveDayWidgetEl.classList.add('hidden');
       return;
     }
 
+    const now = new Date();
+    let currentLesson = null;
     let nextLesson = null;
-    let minMinutes = 9999;
+    let lastPastLesson = null;
+    let progressPercent = 0;
+    let remainingMins = 0;
+    let minsUntilNext = 0;
 
-    for (const l of lessons) {
-      const mins = getMinutesUntilStart(l.start_time);
-      if (mins > 0 && mins < minMinutes && mins <= 90) {
-        minMinutes = mins;
-        nextLesson = l;
+    for (const l of rawLessons) {
+      const { start, end } = getLessonTimes(l.start_time, l.end_time);
+      if (now >= start && now <= end) {
+        currentLesson = l;
+        const totalMs = end - start;
+        const elapsedMs = now - start;
+        progressPercent = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
+        remainingMins = Math.max(1, Math.round((end - now) / 60000));
+      } else if (now < start) {
+        if (!nextLesson) {
+          nextLesson = l;
+          minsUntilNext = Math.max(1, Math.round((start - now) / 60000));
+        }
+      } else if (now > end) {
+        lastPastLesson = l;
       }
     }
 
-    if (nextLesson) {
-      const room = nextLesson.classrooms && nextLesson.classrooms[0] ? ` • ауд. ${nextLesson.classrooms[0]}` : '';
-      nextLessonBannerEl.innerHTML = `
-        <span>⏳</span>
-        <span>До пары осталось <b>${minMinutes} мин</b> (${nextLesson.start_time}${room})</span>
+    liveDayWidgetEl.classList.remove('hidden');
+
+    // State 1: A lesson is currently underway!
+    if (currentLesson) {
+      const room = currentLesson.classrooms && currentLesson.classrooms[0] ? `🏫 ${currentLesson.classrooms[0]}` : '';
+      const teacher = currentLesson.teachers && currentLesson.teachers[0] ? `👨🏻‍🏫 ${currentLesson.teachers[0]}` : '';
+      const nextSnippet = nextLesson
+        ? `<div class="live-widget-next">
+             <span class="live-next-tag">СЛЕДУЮЩАЯ:</span>
+             <span class="live-next-text">${nextLesson.number} пара (${nextLesson.start_time}) • ${nextLesson.subject}</span>
+           </div>`
+        : '';
+
+      liveDayWidgetEl.innerHTML = `
+        <div class="live-widget current-state" id="activeLiveCard">
+          <div class="live-widget-top">
+            <div class="live-pill live-pill-green">
+              <span class="pulse-dot"></span>
+              <span>ИДЁТ ${currentLesson.number} ПАРА</span>
+            </div>
+            <span class="live-countdown">⏳ Осталось ${remainingMins} мин</span>
+          </div>
+          <div class="live-subject">${currentLesson.subject}</div>
+          <div class="live-meta">
+            ${room ? `<span>${room}</span>` : ''}
+            ${teacher ? `<span>${teacher}</span>` : ''}
+          </div>
+          <div class="live-progress-bar">
+            <div class="live-progress-fill" style="width: ${progressPercent}%"></div>
+          </div>
+          ${nextSnippet}
+        </div>
       `;
-      nextLessonBannerEl.classList.remove('hidden');
-    } else {
-      nextLessonBannerEl.classList.add('hidden');
+    }
+    // State 2: Break between classes (Перемена!)
+    else if (nextLesson && lastPastLesson) {
+      const room = nextLesson.classrooms && nextLesson.classrooms[0] ? `🏫 ${nextLesson.classrooms[0]}` : '';
+      const teacher = nextLesson.teachers && nextLesson.teachers[0] ? `👨🏻‍🏫 ${nextLesson.teachers[0]}` : '';
+
+      liveDayWidgetEl.innerHTML = `
+        <div class="live-widget break-state" id="activeLiveCard">
+          <div class="live-widget-top">
+            <div class="live-pill live-pill-orange">
+              <span>☕</span>
+              <span>ПЕРЕМЕНА</span>
+            </div>
+            <span class="live-countdown">До звонка ${minsUntilNext} мин</span>
+          </div>
+          <div class="live-subtitle">Следующая пара (${nextLesson.start_time}):</div>
+          <div class="live-subject">${nextLesson.number} пара • ${nextLesson.subject}</div>
+          <div class="live-meta">
+            ${room ? `<span>${room}</span>` : ''}
+            ${teacher ? `<span>${teacher}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+    // State 3: Before first lesson today
+    else if (nextLesson && !lastPastLesson) {
+      const room = nextLesson.classrooms && nextLesson.classrooms[0] ? `🏫 ${nextLesson.classrooms[0]}` : '';
+      const timeFmt =
+        minsUntilNext > 60
+          ? `${Math.floor(minsUntilNext / 60)} ч ${minsUntilNext % 60} мин`
+          : `${minsUntilNext} мин`;
+
+      liveDayWidgetEl.innerHTML = `
+        <div class="live-widget before-state" id="activeLiveCard">
+          <div class="live-widget-top">
+            <div class="live-pill live-pill-blue">
+              <span>🌅</span>
+              <span>СКОРО НАЧАЛО</span>
+            </div>
+            <span class="live-countdown">Через ${timeFmt}</span>
+          </div>
+          <div class="live-subtitle">1-я пара в ${nextLesson.start_time}:</div>
+          <div class="live-subject">${nextLesson.number} пара • ${nextLesson.subject}</div>
+          <div class="live-meta">
+            ${room ? `<span>${room}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+    // State 4: All lessons finished for today
+    else if (!currentLesson && !nextLesson && rawLessons.length > 0) {
+      liveDayWidgetEl.innerHTML = `
+        <div class="live-widget done-state">
+          <div class="live-widget-top">
+            <div class="live-pill live-pill-purple">
+              <span>🎉</span>
+              <span>ДЕНЬ ЗАВЕРШЁН</span>
+            </div>
+          </div>
+          <div class="live-subject">Все пары на сегодня закончились!</div>
+          <div class="live-meta">
+            <span>Проведено пар: ${rawLessons.length}. Отличного отдыха ✨</span>
+          </div>
+        </div>
+      `;
+    }
+
+    const card = document.getElementById('activeLiveCard');
+    if (card) {
+      card.addEventListener('click', () => {
+        haptic('light');
+        const target =
+          document.querySelector('.active-lesson') ||
+          document.querySelector('.next-lesson-card');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
     }
   }
 
@@ -293,7 +411,7 @@
     const currentDayData = state.weekDays[state.selectedDay];
     const rawLessons = currentDayData?.lessons || [];
 
-    updateNextLessonBanner(rawLessons, currentDayData?.date);
+    updateLiveDayWidget(rawLessons, currentDayData?.date);
 
     // Apply Filter
     let lessons = rawLessons;
@@ -322,13 +440,64 @@
       return;
     }
 
+    const now = new Date();
+    const todayISO = now.toISOString().split('T')[0];
+    const isToday = currentDayData?.date === todayISO;
+
+    // Find current and next lesson among rawLessons
+    let currentLessonObj = null;
+    let nextLessonObj = null;
+    let curProgress = 0;
+    let curRemaining = 0;
+
+    if (isToday) {
+      for (const l of rawLessons) {
+        const { start, end } = getLessonTimes(l.start_time, l.end_time);
+        if (now >= start && now <= end) {
+          currentLessonObj = l;
+          const totalMs = end - start;
+          const elapsedMs = now - start;
+          curProgress = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
+          curRemaining = Math.max(1, Math.round((end - now) / 60000));
+        } else if (now < start && !nextLessonObj) {
+          nextLessonObj = l;
+        }
+      }
+    }
+
     lessons.forEach((lesson) => {
-      const isNow = isLessonNow(lesson.start_time, lesson.end_time, currentDayData?.date);
-      const badgeClass = getTypeBadgeClass(lesson.lesson_type);
-      const typeName = getTypeDisplayName(lesson.lesson_type);
+      let cardClass = 'lesson-card';
+      let statusBadge = '';
+      let progressLineHtml = '';
+
+      if (isToday) {
+        const { start, end } = getLessonTimes(lesson.start_time, lesson.end_time);
+        const isNow = lesson === currentLessonObj;
+        const isNext = lesson === nextLessonObj;
+        const isPast = now > end;
+
+        if (isNow) {
+          cardClass += ' active-lesson';
+          progressLineHtml = `<div class="card-live-progress" style="width: ${curProgress}%"></div>`;
+          statusBadge = `<span class="now-badge"><span class="pulse-dot"></span>Идет (${curRemaining} мин)</span>`;
+        } else if (isNext) {
+          cardClass += ' next-lesson-card';
+          const minsUntil = Math.max(1, Math.round((start - now) / 60000));
+          statusBadge = `<span class="next-badge">⏱️ Следующая (${minsUntil} мин)</span>`;
+        } else if (isPast) {
+          cardClass += ' past-lesson-card';
+          statusBadge = `<span class="past-badge">✓ Прошла</span>`;
+        }
+      }
+
+      if (!statusBadge) {
+        const badgeClass = getTypeBadgeClass(lesson.lesson_type);
+        const typeName = getTypeDisplayName(lesson.lesson_type);
+        statusBadge = `<span class="lesson-type-badge ${badgeClass}">${typeName}</span>`;
+      }
 
       const card = document.createElement('div');
-      card.className = `lesson-card ${isNow ? 'active-lesson' : ''}`;
+      card.className = cardClass;
 
       let detailsHtml = '';
       if (lesson.teachers && lesson.teachers.length > 0) {
@@ -357,16 +526,13 @@
       }
 
       card.innerHTML = `
+        ${progressLineHtml}
         <div class="lesson-card-header">
           <div class="lesson-time-wrap">
             <span class="lesson-number">${lesson.number}</span>
             <span class="lesson-time">${lesson.start_time} – ${lesson.end_time}</span>
           </div>
-          ${
-            isNow
-              ? `<span class="now-badge"><span class="pulse-dot"></span>Идет (${getRemainingMinutes(lesson.end_time)} мин)</span>`
-              : `<span class="lesson-type-badge ${badgeClass}">${typeName}</span>`
-          }
+          ${statusBadge}
         </div>
         <div class="lesson-subject">${lesson.subject}</div>
         <div class="lesson-details">${detailsHtml}</div>
@@ -375,6 +541,7 @@
       scheduleSliderEl.appendChild(card);
     });
   }
+
 
   function updateHeader() {
     if (!state.currentEntity) return;
@@ -849,5 +1016,15 @@
     }
   }
 
+  // Live status ticker: recalculates progress bars and timers every 10 seconds
+  setInterval(() => {
+    const currentDayData = state.weekDays[state.selectedDay];
+    const todayISO = new Date().toISOString().split('T')[0];
+    if (currentDayData?.date === todayISO) {
+      renderLessons();
+    }
+  }, 10000);
+
   initApp();
 })();
+

@@ -607,28 +607,209 @@ body {
 }
 
 /* Next Lesson Banner */
-.next-lesson-banner {
-  background: linear-gradient(135deg, rgba(36, 129, 204, 0.12), rgba(52, 199, 89, 0.12));
-  border: 1px solid rgba(36, 129, 204, 0.25);
-  border-radius: var(--radius);
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-color);
-  animation: fadeIn 0.3s ease-out;
+/* Live Day Widget (Dynamic Island for Today) */
+.live-day-widget {
+  margin-bottom: 14px;
 }
 
-.next-lesson-banner.hidden {
+.live-day-widget.hidden {
   display: none;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+.live-widget {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background-color: var(--secondary-bg-color);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  animation: widgetSlideDown 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: pointer;
 }
+
+@keyframes widgetSlideDown {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.live-widget.current-state {
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.12), rgba(36, 129, 204, 0.1));
+  border-color: rgba(52, 199, 89, 0.45);
+}
+
+.live-widget.break-state {
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.14), rgba(255, 204, 0, 0.1));
+  border-color: rgba(255, 149, 0, 0.45);
+}
+
+.live-widget.before-state {
+  background: linear-gradient(135deg, rgba(36, 129, 204, 0.12), rgba(88, 86, 214, 0.1));
+  border-color: rgba(36, 129, 204, 0.4);
+}
+
+.live-widget.done-state {
+  background: linear-gradient(135deg, rgba(175, 82, 222, 0.12), rgba(88, 86, 214, 0.1));
+  border-color: rgba(175, 82, 222, 0.35);
+}
+
+.live-widget-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.live-pill-green {
+  background: rgba(52, 199, 89, 0.22);
+  color: #34c759;
+}
+
+.live-pill-orange {
+  background: rgba(255, 149, 0, 0.22);
+  color: #ff9500;
+}
+
+.live-pill-blue {
+  background: rgba(36, 129, 204, 0.22);
+  color: #2481cc;
+}
+
+.live-pill-purple {
+  background: rgba(175, 82, 222, 0.22);
+  color: #af52de;
+}
+
+.live-countdown {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.live-subject {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-color);
+  margin-bottom: 4px;
+}
+
+.live-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--hint-color);
+  margin-bottom: 2px;
+}
+
+.live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--hint-color);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.live-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.live-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #34c759, #30d158);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.live-widget-next {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.live-next-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--hint-color);
+  letter-spacing: 0.4px;
+}
+
+.live-next-text {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card States */
+.lesson-card.active-lesson {
+  border: 1.5px solid #34c759;
+  box-shadow: 0 0 16px rgba(52, 199, 89, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-live-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: #34c759;
+  transition: width 0.5s ease;
+}
+
+.lesson-card.next-lesson-card {
+  border: 1.5px solid #2481cc;
+  background: linear-gradient(135deg, var(--secondary-bg-color), rgba(36, 129, 204, 0.06));
+}
+
+.lesson-card.past-lesson-card {
+  opacity: 0.75;
+}
+
+.past-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--hint-color);
+  background-color: rgba(120, 144, 156, 0.15);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.next-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2481cc;
+  background-color: rgba(36, 129, 204, 0.15);
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 
 /* Modal Handle */
 .modal-handle {
