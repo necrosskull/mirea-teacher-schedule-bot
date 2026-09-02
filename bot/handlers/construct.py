@@ -71,10 +71,11 @@ def construct_weeks_markup(
             [
                 InlineKeyboardButton(
                     text="📱 Открыть в приложении",
-                    web_app=WebAppInfo(url=webapp_link),
+                    url=webapp_link,
                 )
             ]
         )
+
 
     date_buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
 

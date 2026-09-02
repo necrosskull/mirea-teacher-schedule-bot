@@ -125,21 +125,22 @@ def test_construct_markups_with_webapp_button():
 
     item = SearchItem(type="group", uid=10, name="ИКБО-10-23")
     with patch("bot.handlers.construct.settings.webapp_url", "https://schedule.ncrsk.ru/app"):
-        # In inline mode: button IS present
+        # In inline mode: button IS present with url
         markup_inline = construct_weeks_markup(item=item, is_inline=True)
         webapp_btns = [
-            btn for row in markup_inline.inline_keyboard for btn in row if btn.web_app
+            btn for row in markup_inline.inline_keyboard for btn in row if btn.url
         ]
         assert len(webapp_btns) == 1
-        decoded_url = urllib.parse.unquote(webapp_btns[0].web_app.url)
+        decoded_url = urllib.parse.unquote(webapp_btns[0].url)
         assert "https://schedule.ncrsk.ru/app?type=group" in decoded_url
         assert "ИКБО-10-23" in decoded_url
 
         # In private chat mode (is_inline=False): button is NOT present
         markup_normal = construct_weeks_markup(item=item, is_inline=False)
         normal_webapp_btns = [
-            btn for row in markup_normal.inline_keyboard for btn in row if btn.web_app
+            btn for row in markup_normal.inline_keyboard for btn in row if btn.url
         ]
+
         assert len(normal_webapp_btns) == 0
 
         # In workdays (days of week selection): button is NOT present
