@@ -93,15 +93,26 @@
         // Swipe Left -> Next Day
         if (state.selectedDay < 6) {
           switchDay(state.selectedDay + 1, 'left');
+        } else if (state.selectedWeek < 24) {
+          // End of week (Saturday) -> Transition to Monday of next week!
+          haptic('medium');
+          loadSchedule(state.currentEntity, state.selectedWeek + 1, 1, 'left');
+          showToast(`Неделя ${state.selectedWeek + 1}`);
         }
       } else {
         // Swipe Right -> Previous Day
         if (state.selectedDay > 1) {
           switchDay(state.selectedDay - 1, 'right');
+        } else if (state.selectedWeek > 1) {
+          // Start of week (Monday) -> Transition to Saturday of previous week!
+          haptic('medium');
+          loadSchedule(state.currentEntity, state.selectedWeek - 1, 6, 'right');
+          showToast(`Неделя ${state.selectedWeek - 1}`);
         }
       }
     }
   }
+
 
   function switchDay(dayIndex, direction = 'left') {
     haptic('light');
@@ -311,10 +322,14 @@
     parityLabelEl.textContent = state.selectedWeek % 2 === 0 ? 'Чётная' : 'Нечётная';
   }
 
-  async function loadSchedule(entity, week = null) {
+  async function loadSchedule(entity, week = null, targetDay = null, slideDirection = null) {
     const targetWeek = week || state.selectedWeek;
     state.currentEntity = entity;
     updateHeader();
+
+    if (targetDay !== null) {
+      state.selectedDay = targetDay;
+    }
 
     try {
       const query = new URLSearchParams({
@@ -347,11 +362,12 @@
 
       updateWeekBar();
       renderDayRibbon();
-      renderLessons();
+      renderLessons(slideDirection);
     } catch (err) {
       showToast('Не удалось загрузить расписание');
     }
   }
+
 
   async function initApp() {
     // 1. Instant load from local cache if available (0 ms response!)
