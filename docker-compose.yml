@@ -1,6 +1,11 @@
 version: '3'
 services:
   mirea-teacher-schedule-bot:
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,4 +15,4 @@ services:
     volumes:
       - ./bot/db/data:/app/bot/db/data
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
