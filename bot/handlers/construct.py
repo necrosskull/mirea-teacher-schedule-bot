@@ -1,7 +1,9 @@
 import datetime
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from urllib.parse import quote
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
+from bot.config import settings
 from bot.fetch.models import Lesson, ScheduleData, SearchItem
 from bot.fetch.schedule import get_lessons
 from bot.handlers import ImportantDays as ImportantDays
@@ -19,7 +21,7 @@ def construct_item_markup(schedule_items: list[SearchItem]) -> InlineKeyboardMar
     return TEACHER_CLARIFY_MARKUP
 
 
-def construct_weeks_markup():
+def construct_weeks_markup(item: SearchItem | None = None) -> InlineKeyboardMarkup:
     """
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
     если текущий день соответствует некоторой памятной дате+-интервал
@@ -55,8 +57,22 @@ def construct_weeks_markup():
             InlineKeyboardButton(text="Сегодня", callback_data="today"),
             InlineKeyboardButton(text="Завтра", callback_data="tomorrow"),
         ],
-        [InlineKeyboardButton(text="Назад", callback_data="back")],
     ]
+
+    extra_buttons: list[list[InlineKeyboardButton]] = []
+    if settings.webapp_url and item:
+        encoded_name = quote(item.name)
+        webapp_link = f"{settings.webapp_url}?type={item.type}&uid={item.uid}&name={encoded_name}"
+        extra_buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="📱 Открыть в приложении",
+                    web_app=WebAppInfo(url=webapp_link),
+                )
+            ]
+        )
+
+    date_buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
 
     if current_week >= 17:
         if current_week == 17:
@@ -90,13 +106,18 @@ def construct_weeks_markup():
         current_week_button = []
 
     reply_mark = InlineKeyboardMarkup(
-        inline_keyboard=week_buttons + current_week_button + date_buttons
+        inline_keyboard=week_buttons + current_week_button + date_buttons + extra_buttons
     )
 
     return reply_mark
 
 
-def construct_workdays(week: int, schedule: ScheduleData, selected_date=None):
+def construct_workdays(
+    week: int,
+    schedule: ScheduleData,
+    selected_date=None,
+    item: SearchItem | None = None,
+) -> InlineKeyboardMarkup:
     weekdays = {
         1: "ПН",
         2: "ВТ",
@@ -134,7 +155,6 @@ def construct_workdays(week: int, schedule: ScheduleData, selected_date=None):
             sign = "◖"
             sign1 = "◗"
 
-
         if date not in lesson_dates:
             sign = "⛔"
             callback = "chill"
@@ -153,7 +173,20 @@ def construct_workdays(week: int, schedule: ScheduleData, selected_date=None):
     if lesson_dates:
         button_rows.append([InlineKeyboardButton(text="На неделю", callback_data="week")])
 
+    if settings.webapp_url and item:
+        encoded_name = quote(item.name)
+        webapp_link = f"{settings.webapp_url}?type={item.type}&uid={item.uid}&name={encoded_name}&week={week}"
+        button_rows.append(
+            [
+                InlineKeyboardButton(
+                    text="📱 Открыть в приложении",
+                    web_app=WebAppInfo(url=webapp_link),
+                )
+            ]
+        )
+
     button_rows.append([InlineKeyboardButton(text="Назад", callback_data="back")])
     ready_markup = InlineKeyboardMarkup(inline_keyboard=button_rows)
 
     return ready_markup
+

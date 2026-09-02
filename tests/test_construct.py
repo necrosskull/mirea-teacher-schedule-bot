@@ -118,3 +118,28 @@ def test_construct_workdays():
         ]
         assert "week" in all_callbacks
         assert "back" in all_callbacks
+
+
+def test_construct_markups_with_webapp_button():
+    import urllib.parse
+
+    item = SearchItem(type="group", uid=10, name="ИКБО-10-23")
+    with patch("bot.handlers.construct.settings.webapp_url", "https://schedule.ncrsk.ru/app"):
+        markup_weeks = construct_weeks_markup(item=item)
+        webapp_btns = [
+            btn for row in markup_weeks.inline_keyboard for btn in row if btn.web_app
+        ]
+        assert len(webapp_btns) == 1
+        decoded_url = urllib.parse.unquote(webapp_btns[0].web_app.url)
+        assert "https://schedule.ncrsk.ru/app?type=group" in decoded_url
+        assert "ИКБО-10-23" in decoded_url
+
+        schedule = ScheduleData(data=[])
+        markup_days = construct_workdays(week=3, schedule=schedule, item=item)
+        webapp_days_btns = [
+            btn for row in markup_days.inline_keyboard for btn in row if btn.web_app
+        ]
+        assert len(webapp_days_btns) == 1
+        assert "week=3" in webapp_days_btns[0].web_app.url
+
+

@@ -110,9 +110,10 @@ async def handle_query(
                     message_text=f"ℹ️ Выбрано расписание: {item.name}!\n"
                     + "🗓️ Выберите неделю:"
                 ),
-                reply_markup=construct.construct_weeks_markup(),
+                reply_markup=construct.construct_weeks_markup(item=item),
             )
         )
+
 
     return await inline_query.answer(
         inline_results,

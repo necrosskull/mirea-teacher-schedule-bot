@@ -965,6 +965,41 @@
     }, 200);
   });
 
+  function getDeeplinkTarget() {
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const type = urlParams.get('type');
+      const uid = urlParams.get('uid');
+      const name = urlParams.get('name');
+      const week = urlParams.get('week');
+
+      if (type && name) {
+        return {
+          type: type,
+          uid: uid ? parseInt(uid) : 0,
+          name: decodeURIComponent(name),
+          week: week ? parseInt(week) : null,
+        };
+      }
+
+      // Telegram WebApp start_param (t.me/bot?startapp=...)
+      const startParam = tg?.initDataUnsafe?.start_param;
+      if (startParam) {
+        const parts = startParam.split('_');
+        if (parts.length >= 2) {
+          return {
+            type: parts[0],
+            uid: parseInt(parts[1]) || 0,
+            name: parts.slice(2).join('_') || `${parts[0]}_${parts[1]}`,
+            week: null,
+          };
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
   async function initApp() {
     // Request permission to send messages (for users who open Mini App before /start)
     if (tg && typeof tg.requestWriteAccess === 'function') {
@@ -975,6 +1010,19 @@
           }
         });
       } catch (e) {}
+    }
+
+    const todayWd = new Date().getDay();
+    state.selectedDay = todayWd === 0 ? 1 : todayWd;
+
+    // Check for Deeplink directly from bot inline button or link
+    const deeplink = getDeeplinkTarget();
+    if (deeplink) {
+      await loadSchedule(
+        { type: deeplink.type, uid: deeplink.uid, name: deeplink.name },
+        deeplink.week
+      );
+      return;
     }
 
     // 1. Instant load from local cache if available (0 ms response!)
@@ -996,9 +1044,6 @@
       }
     } catch (e) {}
 
-    const todayWd = new Date().getDay();
-    state.selectedDay = todayWd === 0 ? 1 : todayWd;
-
     // 2. Fetch user profile and favorite
     try {
       const meRes = await fetch(`/api/me?init_data=${encodeURIComponent(state.initData)}`);
@@ -1015,6 +1060,7 @@
       openSearch();
     }
   }
+
 
   // Live status ticker: recalculates progress bars and timers every 10 seconds
   setInterval(() => {
