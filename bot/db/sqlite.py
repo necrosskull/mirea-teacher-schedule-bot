@@ -66,6 +66,8 @@ async def init_db(db_path: str | None = None):
             "notify_uid": "INTEGER",
             "notify_name": "TEXT",
             "last_notified_date": "TEXT",
+            "created_at": "REAL DEFAULT 0",
+            "last_active_at": "REAL DEFAULT 0",
         }
 
         for column, ddl in columns_to_add.items():
@@ -78,6 +80,14 @@ async def init_db(db_path: str | None = None):
             ON schedulebot (notify_enabled, notify_time, last_notified_date)
             """
         )
+
+        await conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_schedulebot_activity
+            ON schedulebot (last_active_at, created_at)
+            """
+        )
+
 
         await conn.execute(
             """

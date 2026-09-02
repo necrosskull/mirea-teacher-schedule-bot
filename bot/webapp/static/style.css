@@ -1172,6 +1172,107 @@ body {
   font-weight: 500;
 }
 
+.metric-sub {
+  font-size: 9px;
+  font-weight: 600;
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.12);
+  padding: 1px 5px;
+  border-radius: 6px;
+  margin-top: 2px;
+  align-self: center;
+}
+
+.metric-sub.highlight {
+  color: var(--button-color);
+  background: rgba(36, 129, 204, 0.12);
+}
+
+/* Distribution Card */
+.admin-dist-card {
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-dist-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--secondary-bg-color);
+  gap: 2px;
+}
+
+.dist-segment {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.dist-segment.seg-group, .dist-dot.seg-group {
+  background-color: #34c759;
+}
+
+.dist-segment.seg-teacher, .dist-dot.seg-teacher {
+  background-color: #2481cc;
+}
+
+.dist-segment.seg-classroom, .dist-dot.seg-classroom {
+  background-color: #ff9500;
+}
+
+.admin-dist-legend {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.dist-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--hint-color);
+}
+
+.dist-legend-item b {
+  color: var(--text-color);
+}
+
+.dist-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Chips Row for Notification Times */
+.admin-chips-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-chip {
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.admin-chip b {
+  color: var(--button-color);
+}
+
+
 .admin-section-heading {
   font-size: 13px;
   font-weight: 700;

@@ -91,11 +91,18 @@ def create_webapp_app(
         if raw_data:
             validated = validate_telegram_init_data(raw_data)
             if validated:
+                uid = int(validated["id"])
+                asyncio.create_task(
+                    user_service.record_user_activity(
+                        uid, validated.get("first_name"), validated.get("username")
+                    )
+                )
                 return validated
 
         # In test / dev environments when user_id is provided directly
         if user_id:
             return {"id": user_id, "first_name": "User"}
+
 
         raise HTTPException(
             status_code=401, detail="Unauthorized: invalid or missing Telegram initData"
@@ -273,6 +280,33 @@ def create_webapp_app(
         users_with_fav = await user_service.count_users_with_favorite()
         users_with_notify = await user_service.count_users_with_notifications()
 
+        # Activity periods: DAU (24h), WAU (7d), MAU (30d)
+        dau = await user_service.get_active_users_count(86400)
+        wau = await user_service.get_active_users_count(7 * 86400)
+        mau = await user_service.get_active_users_count(30 * 86400)
+
+        # New registrations
+        new_today = await user_service.get_new_users_count(86400)
+        new_week = await user_service.get_new_users_count(7 * 86400)
+        new_month = await user_service.get_new_users_count(30 * 86400)
+
+        # Content demand breakdown
+        type_dist = await user_service.get_requests_distribution()
+        total_requests = await user_service.get_total_requests_count()
+        sum_requests = sum(type_dist.values()) or 1
+        type_percentages = {
+            "group": round((type_dist.get("group", 0) / sum_requests) * 100, 1),
+            "teacher": round((type_dist.get("teacher", 0) / sum_requests) * 100, 1),
+            "classroom": round((type_dist.get("classroom", 0) / sum_requests) * 100, 1),
+        }
+
+        # Conversion rates
+        fav_pct = round((users_with_fav / total_users * 100), 1) if total_users else 0
+        notify_pct = round((users_with_notify / total_users * 100), 1) if total_users else 0
+
+        # Notification times
+        top_notif_times = await user_service.get_top_notification_times(limit=5)
+
         top_groups = await user_service.get_top_requested_items("group", limit=5)
         top_teachers = await user_service.get_top_requested_items("teacher", limit=5)
         top_classrooms = await user_service.get_top_requested_items("classroom", limit=5)
@@ -281,12 +315,27 @@ def create_webapp_app(
             "total_users": total_users,
             "users_with_favorite": users_with_fav,
             "users_with_notifications": users_with_notify,
+            "fav_rate": f"{fav_pct}%",
+            "notify_rate": f"{notify_pct}%",
+            "dau": dau,
+            "wau": wau,
+            "mau": mau,
+            "new_today": new_today,
+            "new_week": new_week,
+            "new_month": new_month,
+            "total_requests": total_requests,
+            "type_distribution": type_dist,
+            "type_percentages": type_percentages,
+            "top_notification_times": [
+                {"time": time_str, "count": count} for time_str, count in top_notif_times
+            ],
             "top_groups": [{"name": name, "count": count} for name, count in top_groups],
             "top_teachers": [{"name": name, "count": count} for name, count in top_teachers],
             "top_classrooms": [{"name": name, "count": count} for name, count in top_classrooms],
             "maintenance_mode": bool(bot_data.get("maintenance_mode", False)),
             "maintenance_message": bot_data.get("maintenance_message") or "",
         }
+
 
     @app.post("/api/admin/maintenance")
     async def set_admin_maintenance(

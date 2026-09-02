@@ -172,6 +172,11 @@ async def test_webapp_api_endpoints():
         mock_user_service.count_all_users.return_value = 150
         mock_user_service.count_users_with_favorite.return_value = 80
         mock_user_service.count_users_with_notifications.return_value = 45
+        mock_user_service.get_active_users_count.return_value = 42
+        mock_user_service.get_new_users_count.return_value = 10
+        mock_user_service.get_requests_distribution.return_value = {"group": 80, "teacher": 20, "classroom": 0}
+        mock_user_service.get_total_requests_count.return_value = 100
+        mock_user_service.get_top_notification_times.return_value = [("08:00", 15)]
         mock_user_service.get_top_requested_items.return_value = [("ИКБО-10-23", 42)]
 
         r_admin_stats_ok = await client.get("/api/admin/stats?user_id=999")
@@ -180,6 +185,11 @@ async def test_webapp_api_endpoints():
         assert stats_data["total_users"] == 150
         assert stats_data["users_with_favorite"] == 80
         assert stats_data["users_with_notifications"] == 45
+        assert stats_data["dau"] == 42
+        assert stats_data["total_requests"] == 100
+        assert "type_percentages" in stats_data
+        assert "top_notification_times" in stats_data
+
 
         r_admin_maint_ok = await client.post(
             "/api/admin/maintenance?user_id=999",

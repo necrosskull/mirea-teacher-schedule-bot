@@ -49,6 +49,18 @@ async def run() -> None:
 
     set_state_service(state_service)
 
+    @dispatcher.update.outer_middleware
+    async def track_user_activity(handler, event, data):
+        user = data.get("event_from_user")
+        if user and not user.is_bot:
+            asyncio.create_task(
+                user_service.record_user_activity(
+                    user.id, user.first_name, user.username
+                )
+            )
+        return await handler(event, data)
+
+
     # Setup Menu Button if WEBAPP_URL is set
     if settings.webapp_url:
         from aiogram.types import MenuButtonWebApp, WebAppInfo

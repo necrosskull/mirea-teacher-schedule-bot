@@ -75,3 +75,46 @@ class UserService:
         except Exception as e:
             lazy_logger.logger.warning(f"UserService.get_top_requested_items failed: {e}")
             return []
+
+    async def record_user_activity(
+        self, user_id: int, first_name: str | None = None, username: str | None = None
+    ):
+        try:
+            await self._user_repository.record_user_activity(user_id, first_name, username)
+        except Exception as e:
+            lazy_logger.logger.warning(f"UserService.record_user_activity failed: {e}")
+
+    async def get_active_users_count(self, seconds: int) -> int:
+        try:
+            return await self._user_repository.get_active_users_count(seconds)
+        except Exception as e:
+            lazy_logger.logger.warning(f"UserService.get_active_users_count failed: {e}")
+            return 0
+
+    async def get_new_users_count(self, seconds: int) -> int:
+        try:
+            return await self._user_repository.get_new_users_count(seconds)
+        except Exception as e:
+            lazy_logger.logger.warning(f"UserService.get_new_users_count failed: {e}")
+            return 0
+
+    async def get_requests_distribution(self) -> dict[str, int]:
+        try:
+            return await self._user_repository.get_requests_distribution()
+        except Exception as e:
+            lazy_logger.logger.warning(f"UserService.get_requests_distribution failed: {e}")
+            return {"group": 0, "teacher": 0, "classroom": 0}
+
+    async def get_total_requests_count(self) -> int:
+        try:
+            return await self._user_repository.get_total_requests_count()
+        except Exception as e:
+            lazy_logger.logger.warning(f"UserService.get_total_requests_count failed: {e}")
+            return 0
+
+    async def get_top_notification_times(self, limit: int = 5) -> list[tuple[str, int]]:
+        try:
+            return await self._user_repository.get_top_notification_times(limit)
+        except Exception as e:
+            lazy_logger.logger.warning(f"UserService.get_top_notification_times failed: {e}")
+            return []

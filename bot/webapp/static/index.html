@@ -168,22 +168,79 @@
         <div class="admin-modal-body">
           <!-- 1. Stats View -->
           <div id="adminViewStats" class="admin-view active">
+            <!-- Period Activity (DAU / WAU / MAU) -->
+            <div class="admin-section-heading">⚡ Активность аудитории</div>
             <div class="admin-metrics-grid">
               <div class="metric-card">
-                <div class="metric-num" id="statTotalUsers">0</div>
-                <div class="metric-label">👥 Всего пользователей</div>
+                <div class="metric-num" id="statDau">0</div>
+                <div class="metric-label">DAU (24 часа)</div>
+                <span class="metric-sub" id="statNewToday">+0 новых</span>
               </div>
               <div class="metric-card">
-                <div class="metric-num" id="statFavUsers">0</div>
-                <div class="metric-label">⭐ С избранным</div>
+                <div class="metric-num" id="statWau">0</div>
+                <div class="metric-label">WAU (7 дней)</div>
+                <span class="metric-sub" id="statNewWeek">+0 новых</span>
               </div>
               <div class="metric-card">
-                <div class="metric-num" id="statNotifyUsers">0</div>
-                <div class="metric-label">🔔 Уведомления</div>
+                <div class="metric-num" id="statMau">0</div>
+                <div class="metric-label">MAU (30 дней)</div>
+                <span class="metric-sub" id="statNewMonth">+0 новых</span>
               </div>
             </div>
 
-            <div class="admin-section-heading">🔥 Топ-5 частых запросов</div>
+            <!-- Base & Conversions -->
+            <div class="admin-section-heading" style="margin-top: 4px;">👥 База и вовлечённость</div>
+            <div class="admin-metrics-grid">
+              <div class="metric-card">
+                <div class="metric-num" id="statTotalUsers">0</div>
+                <div class="metric-label">Всего юзеров</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-num" id="statFavUsers">0</div>
+                <div class="metric-label">В избранном</div>
+                <span class="metric-sub highlight" id="statFavRate">0%</span>
+              </div>
+              <div class="metric-card">
+                <div class="metric-num" id="statNotifyUsers">0</div>
+                <div class="metric-label">Уведомления</div>
+                <span class="metric-sub highlight" id="statNotifyRate">0%</span>
+              </div>
+            </div>
+
+            <!-- Demand & Request Distribution -->
+            <div class="admin-section-heading" style="margin-top: 4px;">
+              📊 Структура интереса (всего <span id="statTotalRequests">0</span> запросов)
+            </div>
+            <div class="admin-dist-card">
+              <div class="admin-dist-bar">
+                <div id="distBarGroup" class="dist-segment seg-group" style="width: 70%;" title="Группы"></div>
+                <div id="distBarTeacher" class="dist-segment seg-teacher" style="width: 20%;" title="Преподаватели"></div>
+                <div id="distBarClassroom" class="dist-segment seg-classroom" style="width: 10%;" title="Аудитории"></div>
+              </div>
+              <div class="admin-dist-legend">
+                <div class="dist-legend-item">
+                  <span class="dist-dot seg-group"></span>
+                  <span>Группы: <b id="distTextGroup">0 (0%)</b></span>
+                </div>
+                <div class="dist-legend-item">
+                  <span class="dist-dot seg-teacher"></span>
+                  <span>Преподы: <b id="distTextTeacher">0 (0%)</b></span>
+                </div>
+                <div class="dist-legend-item">
+                  <span class="dist-dot seg-classroom"></span>
+                  <span>Аудитории: <b id="distTextClassroom">0 (0%)</b></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notification Times -->
+            <div class="admin-section-heading" style="margin-top: 4px;">⏰ Популярное время утренних рассылок</div>
+            <div id="topNotifList" class="admin-chips-row">
+              <span class="top-empty">Нет настроенных рассылок</span>
+            </div>
+
+            <!-- Top 5 Search Items -->
+            <div class="admin-section-heading" style="margin-top: 4px;">🔥 Топ-5 частых запросов</div>
             <div class="top-lists-grid">
               <div class="top-list-col">
                 <div class="top-list-title">👥 Группы</div>
@@ -205,6 +262,7 @@
               </div>
             </div>
           </div>
+
 
           <!-- 2. Maintenance View -->
           <div id="adminViewMaintenance" class="admin-view hidden">

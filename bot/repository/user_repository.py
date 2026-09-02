@@ -9,17 +9,21 @@ from bot.fetch.models import SearchItem
 
 class UserRepository:
     async def upsert_user(self, user: User):
+        now = time.time()
         await execute(
             """
-            INSERT INTO schedulebot (id, username, first_name, last_name)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO schedulebot (id, username, first_name, last_name, created_at, last_active_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 username = excluded.username,
                 first_name = excluded.first_name,
-                last_name = excluded.last_name
+                last_name = excluded.last_name,
+                last_active_at = excluded.last_active_at,
+                created_at = CASE WHEN schedulebot.created_at IS NULL OR schedulebot.created_at = 0 THEN excluded.created_at ELSE schedulebot.created_at END
             """,
-            (user.id, user.username, user.first_name, user.last_name),
+            (user.id, user.username, user.first_name, user.last_name, now, now),
         )
+
 
     async def set_favorite(self, user_id: int, favorite_text: str):
         await execute(
@@ -199,5 +203,68 @@ class UserRepository:
             """,
             (item_type, limit),
         )
-        return [(row[0], int(row[1])) for row in rows]
+        return [(str(row[0]), int(row[1])) for row in rows]
+
+    async def record_user_activity(
+
+        self, user_id: int, first_name: str | None = None, username: str | None = None
+    ):
+        now = time.time()
+        await execute(
+            """
+            INSERT INTO schedulebot (id, username, first_name, created_at, last_active_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                last_active_at = excluded.last_active_at,
+                username = COALESCE(excluded.username, schedulebot.username),
+                first_name = COALESCE(excluded.first_name, schedulebot.first_name),
+                created_at = CASE WHEN schedulebot.created_at IS NULL OR schedulebot.created_at = 0 THEN excluded.created_at ELSE schedulebot.created_at END
+            """,
+            (user_id, username, first_name, now, now),
+        )
+
+    async def get_active_users_count(self, seconds: int) -> int:
+        threshold = time.time() - seconds
+        row = await fetchone(
+            "SELECT COUNT(*) FROM schedulebot WHERE last_active_at >= ?",
+            (threshold,),
+        )
+        return int(row[0]) if row else 0
+
+    async def get_new_users_count(self, seconds: int) -> int:
+        threshold = time.time() - seconds
+        row = await fetchone(
+            "SELECT COUNT(*) FROM schedulebot WHERE created_at >= ?",
+            (threshold,),
+        )
+        return int(row[0]) if row else 0
+
+    async def get_requests_distribution(self) -> dict[str, int]:
+        rows = await fetchall(
+            "SELECT item_type, SUM(request_count) FROM item_requests GROUP BY item_type"
+        )
+        res = {"group": 0, "teacher": 0, "classroom": 0}
+        for r in rows:
+            if r[0] in res:
+                res[r[0]] = int(r[1] or 0)
+        return res
+
+    async def get_total_requests_count(self) -> int:
+        row = await fetchone("SELECT SUM(request_count) FROM item_requests")
+        return int(row[0] or 0) if row and row[0] is not None else 0
+
+    async def get_top_notification_times(self, limit: int = 5) -> list[tuple[str, int]]:
+        rows = await fetchall(
+            """
+            SELECT notify_time, COUNT(*) as cnt
+            FROM schedulebot
+            WHERE notify_enabled = 1 AND notify_time IS NOT NULL
+            GROUP BY notify_time
+            ORDER BY cnt DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [(str(r[0]), int(r[1])) for r in rows] if rows else []
+
 

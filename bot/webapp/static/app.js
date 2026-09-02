@@ -1218,9 +1218,61 @@
         return;
       }
       const data = await res.json();
+
+      // Activity (DAU / WAU / MAU)
+      const statDauEl = document.getElementById('statDau');
+      const statWauEl = document.getElementById('statWau');
+      const statMauEl = document.getElementById('statMau');
+      const statNewTodayEl = document.getElementById('statNewToday');
+      const statNewWeekEl = document.getElementById('statNewWeek');
+      const statNewMonthEl = document.getElementById('statNewMonth');
+      if (statDauEl) statDauEl.textContent = data.dau ?? 0;
+      if (statWauEl) statWauEl.textContent = data.wau ?? 0;
+      if (statMauEl) statMauEl.textContent = data.mau ?? 0;
+      if (statNewTodayEl) statNewTodayEl.textContent = `+${data.new_today ?? 0} новых`;
+      if (statNewWeekEl) statNewWeekEl.textContent = `+${data.new_week ?? 0} новых`;
+      if (statNewMonthEl) statNewMonthEl.textContent = `+${data.new_month ?? 0} новых`;
+
+      // Base & Conversions
       statTotalUsersEl.textContent = data.total_users ?? 0;
       statFavUsersEl.textContent = data.users_with_favorite ?? 0;
       statNotifyUsersEl.textContent = data.users_with_notifications ?? 0;
+      const statFavRateEl = document.getElementById('statFavRate');
+      const statNotifyRateEl = document.getElementById('statNotifyRate');
+      if (statFavRateEl) statFavRateEl.textContent = data.fav_rate || '0%';
+      if (statNotifyRateEl) statNotifyRateEl.textContent = data.notify_rate || '0%';
+
+      // Distribution Bar & Totals
+      const statTotalRequestsEl = document.getElementById('statTotalRequests');
+      if (statTotalRequestsEl) statTotalRequestsEl.textContent = data.total_requests ?? 0;
+
+      const pcts = data.type_percentages || { group: 0, teacher: 0, classroom: 0 };
+      const dist = data.type_distribution || { group: 0, teacher: 0, classroom: 0 };
+      const distBarGroup = document.getElementById('distBarGroup');
+      const distBarTeacher = document.getElementById('distBarTeacher');
+      const distBarClassroom = document.getElementById('distBarClassroom');
+      if (distBarGroup) distBarGroup.style.width = `${pcts.group}%`;
+      if (distBarTeacher) distBarTeacher.style.width = `${pcts.teacher}%`;
+      if (distBarClassroom) distBarClassroom.style.width = `${pcts.classroom}%`;
+
+      const distTextGroup = document.getElementById('distTextGroup');
+      const distTextTeacher = document.getElementById('distTextTeacher');
+      const distTextClassroom = document.getElementById('distTextClassroom');
+      if (distTextGroup) distTextGroup.textContent = `${dist.group} (${pcts.group}%)`;
+      if (distTextTeacher) distTextTeacher.textContent = `${dist.teacher} (${pcts.teacher}%)`;
+      if (distTextClassroom) distTextClassroom.textContent = `${dist.classroom} (${pcts.classroom}%)`;
+
+      // Top notification times
+      const topNotifListEl = document.getElementById('topNotifList');
+      if (topNotifListEl) {
+        if (!data.top_notification_times || data.top_notification_times.length === 0) {
+          topNotifListEl.innerHTML = '<span class="top-empty">Нет настроенных рассылок</span>';
+        } else {
+          topNotifListEl.innerHTML = data.top_notification_times
+            .map((t) => `<span class="admin-chip">🔔 ${t.time} (<b>${t.count}</b> чел.)</span>`)
+            .join('');
+        }
+      }
 
       const renderTop = (el, items) => {
         if (!items || items.length === 0) {
@@ -1249,6 +1301,7 @@
       showToast('Ошибка загрузки админ-статистики');
     }
   }
+
 
   btnSaveMaintenanceEl.addEventListener('click', async () => {
     haptic('medium');
