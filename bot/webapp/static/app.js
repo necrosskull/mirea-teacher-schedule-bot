@@ -1280,9 +1280,8 @@
     }
   });
 
-  async function handleBroadcast(isTest) {
-    const text = bcTextInputEl.value.trim();
-    let currentUploadedMedia = null;
+  let currentUploadedMedia = null;
+
 
     if (bcFileInputEl) {
       bcFileInputEl.addEventListener('change', async (e) => {
