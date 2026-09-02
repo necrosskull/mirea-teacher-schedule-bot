@@ -380,13 +380,16 @@
     if (!state.currentEntity) return;
 
     entityTitleEl.textContent = state.currentEntity.name;
-    const typeRu =
-      state.currentEntity.type === 'teacher'
-        ? 'Преподаватель'
-        : state.currentEntity.type === 'classroom'
-        ? 'Аудитория'
-        : 'Группа';
-    entitySubtitleEl.textContent = typeRu;
+    if (entitySubtitleEl) {
+      const typeRu =
+        state.currentEntity.type === 'teacher'
+          ? 'Преподаватель'
+          : state.currentEntity.type === 'classroom'
+          ? 'Аудитория'
+          : 'Группа';
+      entitySubtitleEl.textContent = typeRu;
+    }
+
 
     const isFav =
       state.user &&
