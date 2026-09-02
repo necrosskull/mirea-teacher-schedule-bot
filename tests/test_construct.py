@@ -125,31 +125,31 @@ def test_construct_markups_with_webapp_button():
 
     item = SearchItem(type="group", uid=10, name="ИКБО-10-23")
     with patch("bot.handlers.construct.settings.webapp_url", "https://schedule.ncrsk.ru/app"):
-        # In inline mode: button IS present with url
-        markup_inline = construct_weeks_markup(item=item, is_inline=True)
+        # In normal mode on week selection: button IS present with web_app
+        markup_normal = construct_weeks_markup(item=item)
         webapp_btns = [
-            btn for row in markup_inline.inline_keyboard for btn in row if btn.url
+            btn for row in markup_normal.inline_keyboard for btn in row if btn.web_app
         ]
         assert len(webapp_btns) == 1
-        decoded_url = urllib.parse.unquote(webapp_btns[0].url)
+        decoded_url = urllib.parse.unquote(webapp_btns[0].web_app.url)
         assert "https://schedule.ncrsk.ru/app?type=group" in decoded_url
         assert "ИКБО-10-23" in decoded_url
 
-        # In private chat mode (is_inline=False): button is NOT present
-        markup_normal = construct_weeks_markup(item=item, is_inline=False)
-        normal_webapp_btns = [
-            btn for row in markup_normal.inline_keyboard for btn in row if btn.url
+        # Without item (or inline mode): button is NOT present
+        markup_empty = construct_weeks_markup(item=None)
+        empty_webapp_btns = [
+            btn for row in markup_empty.inline_keyboard for btn in row if btn.web_app
         ]
-
-        assert len(normal_webapp_btns) == 0
+        assert len(empty_webapp_btns) == 0
 
         # In workdays (days of week selection): button is NOT present
         schedule = ScheduleData(data=[])
         markup_days = construct_workdays(week=3, schedule=schedule)
         webapp_days_btns = [
-            btn for row in markup_days.inline_keyboard for btn in row if btn.web_app
+            btn for row in markup_days.inline_keyboard for btn in row if btn.web_app or btn.url
         ]
         assert len(webapp_days_btns) == 0
+
 
 
 

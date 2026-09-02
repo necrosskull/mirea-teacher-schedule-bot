@@ -23,7 +23,6 @@ def construct_item_markup(schedule_items: list[SearchItem]) -> InlineKeyboardMar
 
 def construct_weeks_markup(
     item: SearchItem | None = None,
-    is_inline: bool = False,
 ) -> InlineKeyboardMarkup:
     """
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
@@ -62,19 +61,20 @@ def construct_weeks_markup(
         ],
     ]
 
-    # Кнопка «Открыть в приложении» показывается ТОЛЬКО в инлайн-режиме на этапе выбора недели
+    # Кнопка «Открыть в приложении» показывается ТОЛЬКО в обычном режиме на этапе выбора недели
     extra_buttons: list[list[InlineKeyboardButton]] = []
-    if is_inline and settings.webapp_url and item:
+    if settings.webapp_url and item:
         encoded_name = quote(item.name)
         webapp_link = f"{settings.webapp_url}?type={item.type}&uid={item.uid}&name={encoded_name}"
         extra_buttons.append(
             [
                 InlineKeyboardButton(
                     text="📱 Открыть в приложении",
-                    url=webapp_link,
+                    web_app=WebAppInfo(url=webapp_link),
                 )
             ]
         )
+
 
 
     date_buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])

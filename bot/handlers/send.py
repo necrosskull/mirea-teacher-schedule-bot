@@ -99,7 +99,7 @@ async def send_week_selector(
         message = await bot.send_message(
             chat_id=chat_id,
             text=text,
-            reply_markup=construct.construct_weeks_markup(),
+            reply_markup=construct.construct_weeks_markup(selected_item),
         )
         _register_message_id(user_data, message.message_id)
 
@@ -107,8 +107,9 @@ async def send_week_selector(
         await _edit_callback_message(
             event,
             text=text,
-            reply_markup=construct.construct_weeks_markup(),
+            reply_markup=construct.construct_weeks_markup(selected_item),
         )
+
 
     return st.GETWEEK
 
