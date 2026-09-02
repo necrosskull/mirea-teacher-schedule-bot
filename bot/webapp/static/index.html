@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>МИРЭА Расписание</title>
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <!-- Top Navigation Header -->
+    <header class="header">
+      <div class="header-left">
+        <button id="btnSearch" class="icon-btn" aria-label="Поиск">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="header-center">
+        <h1 id="entityTitle" class="entity-title">Загрузка...</h1>
+        <span id="entitySubtitle" class="entity-subtitle">Расписание занятий</span>
+      </div>
+
+      <div class="header-right">
+        <button id="btnFav" class="icon-btn" aria-label="В избранное">
+          <svg id="starIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Week Selector Bar -->
+    <div class="week-bar">
+      <button id="prevWeek" class="week-arrow-btn" aria-label="Предыдущая неделя">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+
+      <div class="week-info" id="weekInfoContainer">
+        <span id="weekLabel" class="week-label">Неделя 1</span>
+        <span id="parityLabel" class="parity-label">Нечётная</span>
+      </div>
+
+      <button id="nextWeek" class="week-arrow-btn" aria-label="Следующая неделя">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+
+      <button id="btnToday" class="today-badge">Сегодня</button>
+    </div>
+
+    <!-- Day Selector Ribbon (Tabs) -->
+    <nav class="day-ribbon" id="dayRibbon">
+      <!-- Generated in JS: Mon to Sat -->
+    </nav>
+
+    <!-- Swipeable Days Container -->
+    <main class="schedule-viewport" id="swipeArea">
+      <div class="schedule-slider" id="scheduleSlider">
+        <!-- Lessons rendered here -->
+      </div>
+    </main>
+
+    <!-- Search Modal -->
+    <div id="searchModal" class="modal hidden">
+      <div class="modal-overlay" id="searchOverlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <input type="text" id="searchInput" placeholder="Группа, преподаватель или аудитория..." autocomplete="off">
+          <button id="closeSearch" class="close-btn">&times;</button>
+        </div>
+        <div class="search-results" id="searchResults">
+          <div class="search-placeholder">Начните вводить название группы (например, КТСО-01-22), фамилию преподавателя или аудиторию...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

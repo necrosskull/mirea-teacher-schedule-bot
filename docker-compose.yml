@@ -9,3 +9,5 @@ services:
     restart: unless-stopped
     volumes:
       - ./bot/db/data:/app/bot/db/data
+    ports:
+      - "8000:8000"

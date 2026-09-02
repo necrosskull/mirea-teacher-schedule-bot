@@ -40,5 +40,37 @@ async def about(message: Message):
     )
 
 
+@router.message(Command("app"))
+async def open_app(message: Message):
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    from bot.config import settings
+
+    webapp_url = settings.webapp_url or f"http://localhost:{settings.webapp_port}/app"
+
+    keyboard = None
+    if settings.webapp_url:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="📱 Открыть расписание",
+                        web_app=WebAppInfo(url=settings.webapp_url),
+                    )
+                ]
+            ]
+        )
+
+    await message.answer(
+        text="📱 *Интерактивное Mini App расписание!*\n\n"
+        "✨ Мгновенный показ вашего избранного (FAV)\n"
+        "👆 Листание дней недели свайпами\n"
+        "🟢 Индикатор текущей пары в реальном времени\n"
+        "🔍 Удобный поиск групп, преподавателей и аудиторий\n\n"
+        + (f"Ссылка для браузера: {webapp_url}" if not settings.webapp_url else ""),
+        reply_markup=keyboard,
+    )
+
+
+
 def init_handlers(dispatcher):
     dispatcher.include_router(router)

@@ -15,9 +15,12 @@ async def test_run_bot(monkeypatch, temp_db):
         patch("dishka.integrations.aiogram.setup_dishka", MagicMock()),
         patch("aiogram.Dispatcher.start_polling", AsyncMock()) as mock_polling,
         patch("bot.handlers.notification.notification_worker", AsyncMock()) as mock_worker,
+        patch("uvicorn.Server.serve", AsyncMock()) as mock_serve,
     ):
         await run()
         mock_polling.assert_called_once()
+        mock_serve.assert_called_once()
+
 
 
 def test_main_bot(monkeypatch):

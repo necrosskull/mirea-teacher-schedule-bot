@@ -29,6 +29,10 @@ class Config:
     schedule_cache_ttl_seconds: int = int(os.getenv("SCHEDULE_CACHE_TTL_SECONDS", "14400"))
     search_cache_ttl_seconds: int = int(os.getenv("SEARCH_CACHE_TTL_SECONDS", "3600"))
     memory_cache_ttl_seconds: int = int(os.getenv("MEMORY_CACHE_TTL_SECONDS", "900"))
+    webapp_url: str = os.getenv("WEBAPP_URL", "")
+    webapp_host: str = os.getenv("WEBAPP_HOST", "0.0.0.0")
+    webapp_port: int = int(os.getenv("WEBAPP_PORT", "8000"))
+
 
 
 
