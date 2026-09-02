@@ -229,4 +229,21 @@ async def test_webapp_api_endpoints():
         assert img_data["status"] == "ok"
         assert img_data["media_type"] == "image"
 
+        # TTL cleanup test
+        import os
+        static_dir = os.path.join(os.path.dirname(__file__), "../bot/webapp/static")
+        uploads_dir = os.path.join(static_dir, "uploads")
+        old_file = os.path.join(uploads_dir, "ancient_test_file.jpg")
+        with open(old_file, "w") as f:
+            f.write("old")
+        os.utime(old_file, (time.time() - 172800, time.time() - 172800))
+        assert os.path.exists(old_file)
+
+        await client.post(
+            "/api/admin/upload?filename=trigger.png&user_id=999",
+            content=b"trigger bytes",
+        )
+        assert not os.path.exists(old_file)
+
+
 

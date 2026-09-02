@@ -2,12 +2,15 @@ import asyncio
 from datetime import date, datetime
 import os
 import re
+import time
 from typing import Annotated
 import uuid
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from bot.logs.lazy_logger import lazy_logger
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -363,6 +366,19 @@ def create_webapp_app(
         if len(body) > 50 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Файл слишком большой (макс. 50 МБ)")
 
+        # Auto-cleanup files older than 24 hours to keep disk lean
+        try:
+            now_ts = time.time()
+            for entry in os.listdir(uploads_dir):
+                fpath = os.path.join(uploads_dir, entry)
+                if os.path.isfile(fpath) and (now_ts - os.path.getmtime(fpath) > 86400):
+                    try:
+                        os.remove(fpath)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         ext = os.path.splitext(filename)[1].lower()
         clean_ext = ext if ext else ".jpg"
         safe_name = f"{uuid.uuid4().hex[:10]}_{re.sub(r'[^a-zA-Z0-9_.-]', '', filename)}"
@@ -406,6 +422,7 @@ def create_webapp_app(
 
         media_val = (req.media_url or req.image_url or "").strip()
         media_target = None
+        local_file_to_delete = None
         is_vid = False
 
         if media_val:
@@ -414,6 +431,7 @@ def create_webapp_app(
                 local_file = os.path.join(static_dir, rel_path)
                 if os.path.exists(local_file):
                     media_target = FSInputFile(local_file)
+                    local_file_to_delete = local_file
             if not media_target:
                 media_target = media_val
 
@@ -421,33 +439,43 @@ def create_webapp_app(
             is_vid = req.media_type == "video" or ext in {".mp4", ".mov", ".avi", ".webm", ".mkv", ".m4v"}
 
         admin_id = int(admin["id"])
+        cached_file_id: str | None = None
 
         async def _send_to(chat_id: int):
+            nonlocal cached_file_id
+            target = cached_file_id or media_target
+
             if is_vid:
-                await bot.send_video(
+                msg = await bot.send_video(
                     chat_id=chat_id,
-                    video=media_target,
+                    video=target,
                     caption=req.text.strip(),
                     reply_markup=markup,
                     parse_mode=ParseMode.HTML,
                 )
-            elif media_target:
-                await bot.send_photo(
+                if not cached_file_id and msg and getattr(msg, "video", None):
+                    cached_file_id = msg.video.file_id
+                return msg
+            elif target:
+                msg = await bot.send_photo(
                     chat_id=chat_id,
-                    photo=media_target,
+                    photo=target,
                     caption=req.text.strip(),
                     reply_markup=markup,
                     parse_mode=ParseMode.HTML,
                 )
+                if not cached_file_id and msg and getattr(msg, "photo", None) and len(msg.photo) > 0:
+                    cached_file_id = msg.photo[-1].file_id
+                return msg
             else:
-                await bot.send_message(
+                return await bot.send_message(
                     chat_id=chat_id,
                     text=req.text.strip(),
                     reply_markup=markup,
                     parse_mode=ParseMode.HTML,
                 )
 
-        # Test sending only to admin
+        # Test sending only to admin (preserves local file for subsequent broadcast)
         if req.test_only:
             try:
                 await _send_to(admin_id)
@@ -466,19 +494,28 @@ def create_webapp_app(
             user_ids = await user_service.get_all_user_ids()
             broadcast_state["total"] = len(user_ids)
 
-            for uid in user_ids:
-                try:
-                    await _send_to(uid)
-                    broadcast_state["sent"] += 1
-                except Exception:
-                    broadcast_state["failed"] += 1
+            try:
+                for uid in user_ids:
+                    try:
+                        await _send_to(uid)
+                        broadcast_state["sent"] += 1
+                    except Exception:
+                        broadcast_state["failed"] += 1
 
-                await asyncio.sleep(0.04)  # ~25 msg/s to safely stay under Telegram 30 msg/s limit
-
-            broadcast_state["is_running"] = False
+                    await asyncio.sleep(0.04)  # ~25 msg/s to safely stay under Telegram 30 msg/s limit
+            finally:
+                broadcast_state["is_running"] = False
+                # Remove media file from disk after mass broadcast completes
+                if local_file_to_delete and os.path.exists(local_file_to_delete):
+                    try:
+                        os.remove(local_file_to_delete)
+                        lazy_logger.logger.info(f"Cleaned up local broadcast media file: {local_file_to_delete}")
+                    except Exception as e:
+                        lazy_logger.logger.warning(f"Failed to delete {local_file_to_delete}: {e}")
 
         asyncio.create_task(_do_broadcast())
         return {"status": "ok", "message": "Рассылка запущена в фоне!"}
+
 
     return app
 
