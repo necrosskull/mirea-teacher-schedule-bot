@@ -684,9 +684,42 @@ body {
   flex-direction: column;
   gap: 4px;
   margin-bottom: 14px;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.calendar-grid.cal-slide-left {
+  animation: calSlideLeft 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.calendar-grid.cal-slide-right {
+  animation: calSlideRight 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes calSlideLeft {
+  from {
+    opacity: 0.3;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes calSlideRight {
+  from {
+    opacity: 0.3;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .cal-row {
+
   display: grid;
   grid-template-columns: 28px repeat(7, 1fr);
   gap: 2px;

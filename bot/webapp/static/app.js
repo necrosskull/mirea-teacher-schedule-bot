@@ -508,9 +508,37 @@
     return Math.max(1, Math.min(24, Math.floor(diffDays / 7) + 1));
   }
 
-  function renderCalendarGrid() {
+  function prevMonth() {
+    haptic('light');
+    state.calMonth--;
+    if (state.calMonth < 0) {
+      state.calMonth = 11;
+      state.calYear--;
+    }
+    renderCalendarGrid('right');
+  }
+
+  function nextMonth() {
+    haptic('light');
+    state.calMonth++;
+    if (state.calMonth > 11) {
+      state.calMonth = 0;
+      state.calYear++;
+    }
+    renderCalendarGrid('left');
+  }
+
+  function renderCalendarGrid(direction = null) {
     calMonthLabelEl.textContent = `${MONTH_NAMES[state.calMonth]} ${state.calYear}`;
     calendarGridEl.innerHTML = '';
+
+    if (direction === 'left') {
+      calendarGridEl.className = 'calendar-grid cal-slide-left';
+    } else if (direction === 'right') {
+      calendarGridEl.className = 'calendar-grid cal-slide-right';
+    } else {
+      calendarGridEl.className = 'calendar-grid';
+    }
 
     const firstDayOfMonth = new Date(state.calYear, state.calMonth, 1);
     const lastDayOfMonth = new Date(state.calYear, state.calMonth + 1, 0);
@@ -587,6 +615,42 @@
     }
   }
 
+  // Calendar Swipe Gestures
+  let calTouchStartX = 0;
+  let calTouchStartY = 0;
+  let calTouchEndX = 0;
+  let calTouchEndY = 0;
+
+  calendarGridEl.addEventListener(
+    'touchstart',
+    (e) => {
+      calTouchStartX = e.changedTouches[0].screenX;
+      calTouchStartY = e.changedTouches[0].screenY;
+    },
+    { passive: true }
+  );
+
+  calendarGridEl.addEventListener(
+    'touchend',
+    (e) => {
+      calTouchEndX = e.changedTouches[0].screenX;
+      calTouchEndY = e.changedTouches[0].screenY;
+      const deltaX = calTouchEndX - calTouchStartX;
+      const deltaY = calTouchEndY - calTouchStartY;
+
+      if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+        if (deltaX < 0) {
+          // Swipe Left -> Next Month
+          nextMonth();
+        } else {
+          // Swipe Right -> Previous Month
+          prevMonth();
+        }
+      }
+    },
+    { passive: true }
+  );
+
   // Filter Pills Handling
   document.querySelectorAll('.filter-pill').forEach((pill) => {
     pill.addEventListener('click', (e) => {
@@ -604,25 +668,9 @@
   calendarOverlayEl.addEventListener('click', closeCalendar);
   calBtnCloseEl.addEventListener('click', closeCalendar);
 
-  calPrevMonthBtn.addEventListener('click', () => {
-    haptic('light');
-    state.calMonth--;
-    if (state.calMonth < 0) {
-      state.calMonth = 11;
-      state.calYear--;
-    }
-    renderCalendarGrid();
-  });
+  calPrevMonthBtn.addEventListener('click', prevMonth);
+  calNextMonthBtn.addEventListener('click', nextMonth);
 
-  calNextMonthBtn.addEventListener('click', () => {
-    haptic('light');
-    state.calMonth++;
-    if (state.calMonth > 11) {
-      state.calMonth = 0;
-      state.calYear++;
-    }
-    renderCalendarGrid();
-  });
 
   calBtnTodayEl.addEventListener('click', () => {
     haptic('medium');
@@ -751,9 +799,21 @@
   });
 
   async function initApp() {
+    // Request permission to send messages (for users who open Mini App before /start)
+    if (tg && typeof tg.requestWriteAccess === 'function') {
+      try {
+        tg.requestWriteAccess((allowed) => {
+          if (allowed) {
+            fetch(`/api/me?init_data=${encodeURIComponent(state.initData)}`).catch(() => {});
+          }
+        });
+      } catch (e) {}
+    }
+
     // 1. Instant load from local cache if available (0 ms response!)
     try {
       const cached = localStorage.getItem('cached_fav_schedule');
+
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed.entity && parsed.days) {

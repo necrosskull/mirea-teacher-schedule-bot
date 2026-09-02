@@ -71,7 +71,23 @@ def create_webapp_app(
     @app.get("/api/me")
     async def get_me(user: dict = Depends(get_current_user)):
         uid = int(user["id"])
+
+        # Auto-register user in DB if they opened Mini App before running /start
+        try:
+            from aiogram.types import User as AiogramUser
+            tg_user = AiogramUser(
+                id=uid,
+                is_bot=False,
+                first_name=user.get("first_name", "") or "User",
+                last_name=user.get("last_name"),
+                username=user.get("username"),
+            )
+            await user_service.ensure_user(tg_user)
+        except Exception:
+            pass
+
         fav = await user_service.get_favorite(uid)
+
 
         favorite_item = None
         if fav:
