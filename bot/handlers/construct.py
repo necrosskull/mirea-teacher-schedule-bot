@@ -21,7 +21,10 @@ def construct_item_markup(schedule_items: list[SearchItem]) -> InlineKeyboardMar
     return TEACHER_CLARIFY_MARKUP
 
 
-def construct_weeks_markup(item: SearchItem | None = None) -> InlineKeyboardMarkup:
+def construct_weeks_markup(
+    item: SearchItem | None = None,
+    is_inline: bool = False,
+) -> InlineKeyboardMarkup:
     """
     Создает KeyboardMarkup со списком недель, а также подставляет эмодзи
     если текущий день соответствует некоторой памятной дате+-интервал
@@ -59,8 +62,9 @@ def construct_weeks_markup(item: SearchItem | None = None) -> InlineKeyboardMark
         ],
     ]
 
+    # Кнопка «Открыть в приложении» показывается ТОЛЬКО в инлайн-режиме на этапе выбора недели
     extra_buttons: list[list[InlineKeyboardButton]] = []
-    if settings.webapp_url and item:
+    if is_inline and settings.webapp_url and item:
         encoded_name = quote(item.name)
         webapp_link = f"{settings.webapp_url}?type={item.type}&uid={item.uid}&name={encoded_name}"
         extra_buttons.append(
@@ -116,7 +120,6 @@ def construct_workdays(
     week: int,
     schedule: ScheduleData,
     selected_date=None,
-    item: SearchItem | None = None,
 ) -> InlineKeyboardMarkup:
     weekdays = {
         1: "ПН",
@@ -173,20 +176,9 @@ def construct_workdays(
     if lesson_dates:
         button_rows.append([InlineKeyboardButton(text="На неделю", callback_data="week")])
 
-    if settings.webapp_url and item:
-        encoded_name = quote(item.name)
-        webapp_link = f"{settings.webapp_url}?type={item.type}&uid={item.uid}&name={encoded_name}&week={week}"
-        button_rows.append(
-            [
-                InlineKeyboardButton(
-                    text="📱 Открыть в приложении",
-                    web_app=WebAppInfo(url=webapp_link),
-                )
-            ]
-        )
-
     button_rows.append([InlineKeyboardButton(text="Назад", callback_data="back")])
     ready_markup = InlineKeyboardMarkup(inline_keyboard=button_rows)
 
     return ready_markup
+
 

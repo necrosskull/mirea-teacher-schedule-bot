@@ -658,7 +658,15 @@
 
       if (data.target_weekday && targetDay === null) {
         state.selectedDay = Math.min(6, Math.max(1, data.target_weekday));
+      } else if (targetDay === null && !targetDate) {
+        if (state.selectedWeek === state.currentWeek) {
+          const todayWd = new Date().getDay();
+          state.selectedDay = todayWd === 0 ? 1 : todayWd;
+        } else {
+          state.selectedDay = 1;
+        }
       }
+
 
       try {
         localStorage.setItem(
@@ -1067,9 +1075,11 @@
     // Check for Deeplink directly from bot inline button or link
     const deeplink = getDeeplinkTarget();
     if (deeplink) {
+      const todayISO = getLocalDateISO();
       await loadSchedule(
         { type: deeplink.type, uid: deeplink.uid, name: deeplink.name },
-        deeplink.week
+        deeplink.week,
+        deeplink.week ? null : todayISO
       );
       return;
     }
@@ -1085,6 +1095,8 @@
           state.weekDays = parsed.days;
           state.datesSummary = parsed.datesSummary || {};
           state.selectedWeek = parsed.week || 1;
+          const todayWd = new Date().getDay();
+          state.selectedDay = todayWd === 0 ? 1 : todayWd;
           updateHeader();
           updateWeekBar();
           renderDayRibbon();
@@ -1092,6 +1104,7 @@
         }
       }
     } catch (e) {}
+
 
     // 2. Fetch user profile and favorite
     try {

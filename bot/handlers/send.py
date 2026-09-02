@@ -99,7 +99,7 @@ async def send_week_selector(
         message = await bot.send_message(
             chat_id=chat_id,
             text=text,
-            reply_markup=construct.construct_weeks_markup(selected_item),
+            reply_markup=construct.construct_weeks_markup(),
         )
         _register_message_id(user_data, message.message_id)
 
@@ -107,7 +107,7 @@ async def send_week_selector(
         await _edit_callback_message(
             event,
             text=text,
-            reply_markup=construct.construct_weeks_markup(selected_item),
+            reply_markup=construct.construct_weeks_markup(),
         )
 
     return st.GETWEEK
@@ -118,7 +118,8 @@ async def send_day_selector(callback: CallbackQuery, user_data: dict):
     week = user_data["week"]
     schedule = user_data["schedule"]
 
-    workdays = construct.construct_workdays(week, schedule, item=selected_item)
+    workdays = construct.construct_workdays(week, schedule)
+
 
 
     type_text = ""
