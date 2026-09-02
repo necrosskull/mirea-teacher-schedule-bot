@@ -144,6 +144,13 @@
     renderLessons(direction);
   }
 
+  function getLocalDateISO(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   function getLessonTimes(startTimeStr, endTimeStr) {
     const now = new Date();
     const [sh, sm] = (startTimeStr || '00:00').split(':').map(Number);
@@ -161,7 +168,7 @@
   function isLessonNow(startTimeStr, endTimeStr, lessonDateStr) {
     try {
       const now = new Date();
-      const todayISO = now.toISOString().split('T')[0];
+      const todayISO = getLocalDateISO(now);
       if (lessonDateStr && lessonDateStr !== todayISO) return false;
 
       const { start, end } = getLessonTimes(startTimeStr, endTimeStr);
@@ -170,6 +177,7 @@
       return false;
     }
   }
+
 
   function getRemainingMinutes(endTimeStr) {
     try {
@@ -252,8 +260,9 @@
   }
 
   function updateLiveDayWidget(rawLessons, currentDateStr) {
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateISO();
     if (currentDateStr !== todayISO || !rawLessons || rawLessons.length === 0) {
+
       liveDayWidgetEl.classList.add('hidden');
       return;
     }
@@ -478,8 +487,9 @@
     }
 
     const now = new Date();
-    const todayISO = now.toISOString().split('T')[0];
+    const todayISO = getLocalDateISO(now);
     const isToday = currentDayData?.date === todayISO;
+
 
     // Find current and next lesson among rawLessons
     let currentLessonObj = null;
@@ -754,8 +764,9 @@
     const startDate = new Date(firstDayOfMonth);
     startDate.setDate(firstDayOfMonth.getDate() - (startWd - 1));
 
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateISO();
     const curActiveDate = state.weekDays[state.selectedDay]?.date;
+
 
     let rowDate = new Date(startDate);
 
@@ -879,7 +890,7 @@
   calBtnTodayEl.addEventListener('click', () => {
     haptic('medium');
     closeCalendar();
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateISO();
     const todayWd = new Date().getDay();
     state.selectedDay = todayWd === 0 ? 1 : todayWd;
     loadSchedule(state.currentEntity, null, todayISO);
@@ -904,9 +915,10 @@
     haptic('medium');
     const todayWd = new Date().getDay();
     state.selectedDay = todayWd === 0 ? 1 : todayWd;
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateISO();
     loadSchedule(state.currentEntity, null, todayISO);
   });
+
 
   // Favorite Star Toggle
   btnFavEl.addEventListener('click', async () => {
@@ -1087,7 +1099,8 @@
       if (meRes.ok) {
         state.user = await meRes.json();
         if (state.user.favorite_item) {
-          await loadSchedule(state.user.favorite_item);
+          const todayISO = getLocalDateISO();
+          await loadSchedule(state.user.favorite_item, null, todayISO);
           return;
         }
       }
@@ -1098,12 +1111,12 @@
     }
   }
 
-
   // Live status ticker: recalculates progress bars and timers every 10 seconds without rebuilding DOM
   setInterval(() => {
     const currentDayData = state.weekDays[state.selectedDay];
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateISO();
     if (currentDayData?.date !== todayISO) return;
+
 
     const rawLessons = currentDayData?.lessons || [];
     updateLiveDayWidget(rawLessons, currentDayData?.date);
