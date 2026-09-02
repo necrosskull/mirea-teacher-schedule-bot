@@ -108,13 +108,22 @@ def create_webapp_app(
         uid: int | None = None,
         name: str | None = None,
         week: int | None = None,
+        date_str: Annotated[str | None, Query(alias="date")] = None,
         use_fav: bool = False,
         user: dict | None = None,
         init_data: str | None = Query(default=None),
         x_telegram_init_data: Annotated[str | None, Header()] = None,
     ):
         current_week = get_current_week_number()
-        target_week = week if (week and 1 <= week <= 24) else current_week
+        target_weekday = None
+
+        if date_str:
+            try:
+                target_week, target_weekday = get_week_and_weekday(date_str)
+            except Exception:
+                target_week = week if (week and 1 <= week <= 24) else current_week
+        else:
+            target_week = week if (week and 1 <= week <= 24) else current_week
 
         target_item: SearchItem | None = None
 
@@ -145,11 +154,13 @@ def create_webapp_app(
                 "week": target_week,
                 "current_week": current_week,
                 "days": {},
+                "dates_summary": {},
             }
 
         # Calculate dates for the requested week
         dates_of_week = get_dates_for_week(target_week)
         lessons = schedule_service.get_lessons(schedule_data, dates=dates_of_week)
+        dates_summary = schedule_service.get_dates_summary(schedule_data)
 
         # Group lessons by day (1..6)
         days_map: dict[int, dict] = {}
@@ -185,7 +196,10 @@ def create_webapp_app(
             "current_week": current_week,
             "today_date": date.today().isoformat(),
             "today_weekday": date.today().isoweekday(),
+            "target_weekday": target_weekday,
             "days": days_map,
+            "dates_summary": dates_summary,
         }
+
 
     return app

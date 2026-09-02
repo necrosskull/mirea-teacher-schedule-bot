@@ -16,6 +16,10 @@
   }
 
   const DAY_NAMES = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+  const MONTH_NAMES = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+  ];
 
   // Application State
   const state = {
@@ -26,7 +30,11 @@
     currentWeek: 1,
     selectedDay: 1, // 1=Mon, 6=Sat
     weekDays: {}, // map 1..6 -> { date, weekday, lessons: [] }
+    datesSummary: {}, // map 'YYYY-MM-DD' -> ['lecture', 'practice', ...]
+    activeFilter: 'all', // 'all' | 'lecture' | 'practice' | 'lab'
     initData: tg?.initData || '',
+    calYear: new Date().getFullYear(),
+    calMonth: new Date().getMonth(), // 0..11
   };
 
   // DOM Elements
@@ -35,19 +43,35 @@
   const btnFavEl = document.getElementById('btnFav');
   const starIconEl = document.getElementById('starIcon');
   const btnSearchEl = document.getElementById('btnSearch');
+  const btnCalendarEl = document.getElementById('btnCalendar');
   const prevWeekBtn = document.getElementById('prevWeek');
   const nextWeekBtn = document.getElementById('nextWeek');
   const weekLabelEl = document.getElementById('weekLabel');
   const parityLabelEl = document.getElementById('parityLabel');
+  const weekInfoContainer = document.getElementById('weekInfoContainer');
   const btnTodayEl = document.getElementById('btnToday');
   const dayRibbonEl = document.getElementById('dayRibbon');
   const scheduleSliderEl = document.getElementById('scheduleSlider');
   const swipeAreaEl = document.getElementById('swipeArea');
+  const nextLessonBannerEl = document.getElementById('nextLessonBanner');
+
+  // Search Modal
   const searchModalEl = document.getElementById('searchModal');
   const searchOverlayEl = document.getElementById('searchOverlay');
   const searchInputEl = document.getElementById('searchInput');
   const searchResultsEl = document.getElementById('searchResults');
   const closeSearchBtn = document.getElementById('closeSearch');
+
+  // Calendar Modal
+  const calendarModalEl = document.getElementById('calendarModal');
+  const calendarOverlayEl = document.getElementById('calendarOverlay');
+  const calMonthLabelEl = document.getElementById('calMonthLabel');
+  const calPrevMonthBtn = document.getElementById('calPrevMonth');
+  const calNextMonthBtn = document.getElementById('calNextMonth');
+  const calendarGridEl = document.getElementById('calendarGrid');
+  const calBtnTodayEl = document.getElementById('calBtnToday');
+  const calBtnCloseEl = document.getElementById('calBtnClose');
+
   const toastEl = document.getElementById('toast');
 
   function showToast(text) {
@@ -87,16 +111,15 @@
     const deltaX = touchEndX - touchStartX;
     const deltaY = touchEndY - touchStartY;
 
-    // Ensure horizontal swipe is dominant and exceeds minimum threshold (45px)
     if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
       if (deltaX < 0) {
         // Swipe Left -> Next Day
         if (state.selectedDay < 6) {
           switchDay(state.selectedDay + 1, 'left');
         } else if (state.selectedWeek < 24) {
-          // End of week (Saturday) -> Transition to Monday of next week!
+          // Transition to Monday of next week
           haptic('medium');
-          loadSchedule(state.currentEntity, state.selectedWeek + 1, 1, 'left');
+          loadSchedule(state.currentEntity, state.selectedWeek + 1, null, 1, 'left');
           showToast(`Неделя ${state.selectedWeek + 1}`);
         }
       } else {
@@ -104,27 +127,20 @@
         if (state.selectedDay > 1) {
           switchDay(state.selectedDay - 1, 'right');
         } else if (state.selectedWeek > 1) {
-          // Start of week (Monday) -> Transition to Saturday of previous week!
+          // Transition to Saturday of previous week
           haptic('medium');
-          loadSchedule(state.currentEntity, state.selectedWeek - 1, 6, 'right');
+          loadSchedule(state.currentEntity, state.selectedWeek - 1, null, 6, 'right');
           showToast(`Неделя ${state.selectedWeek - 1}`);
         }
       }
     }
   }
 
-
   function switchDay(dayIndex, direction = 'left') {
     haptic('light');
     state.selectedDay = dayIndex;
     renderDayRibbon();
     renderLessons(direction);
-  }
-
-  function formatTimeHHMM(dt) {
-    const h = String(dt.getHours()).padStart(2, '0');
-    const m = String(dt.getMinutes()).padStart(2, '0');
-    return `${h}:${m}`;
   }
 
   function isLessonNow(startTimeStr, endTimeStr, lessonDateStr) {
@@ -161,6 +177,19 @@
     }
   }
 
+  function getMinutesUntilStart(startTimeStr) {
+    try {
+      const now = new Date();
+      const [sh, sm] = startTimeStr.split(':').map(Number);
+      const start = new Date(now);
+      start.setHours(sh, sm, 0, 0);
+      const diffMs = start - now;
+      return Math.round(diffMs / 60000);
+    } catch (e) {
+      return -1;
+    }
+  }
+
   function getTypeBadgeClass(type) {
     const t = (type || '').toLowerCase();
     if (t.includes('лекц') || t.includes('lecture')) return 'type-lecture';
@@ -168,6 +197,15 @@
     if (t.includes('лаб') || t.includes('laboratory')) return 'type-lab';
     if (t.includes('экзамен') || t.includes('exam') || t.includes('зачет')) return 'type-exam';
     return 'type-default';
+  }
+
+  function getDotClass(type) {
+    const t = (type || '').toLowerCase();
+    if (t.includes('лекц') || t.includes('lecture')) return 'dot-lecture';
+    if (t.includes('практ') || t.includes('practice')) return 'dot-practice';
+    if (t.includes('лаб') || t.includes('laboratory')) return 'dot-lab';
+    if (t.includes('экзамен') || t.includes('exam') || t.includes('зачет')) return 'dot-exam';
+    return 'dot-other';
   }
 
   function getTypeDisplayName(type) {
@@ -212,6 +250,36 @@
     }
   }
 
+  function updateNextLessonBanner(lessons, currentDateStr) {
+    const todayISO = new Date().toISOString().split('T')[0];
+    if (currentDateStr !== todayISO || !lessons || lessons.length === 0) {
+      nextLessonBannerEl.classList.add('hidden');
+      return;
+    }
+
+    let nextLesson = null;
+    let minMinutes = 9999;
+
+    for (const l of lessons) {
+      const mins = getMinutesUntilStart(l.start_time);
+      if (mins > 0 && mins < minMinutes && mins <= 90) {
+        minMinutes = mins;
+        nextLesson = l;
+      }
+    }
+
+    if (nextLesson) {
+      const room = nextLesson.classrooms && nextLesson.classrooms[0] ? ` • ауд. ${nextLesson.classrooms[0]}` : '';
+      nextLessonBannerEl.innerHTML = `
+        <span>⏳</span>
+        <span>До пары осталось <b>${minMinutes} мин</b> (${nextLesson.start_time}${room})</span>
+      `;
+      nextLessonBannerEl.classList.remove('hidden');
+    } else {
+      nextLessonBannerEl.classList.add('hidden');
+    }
+  }
+
   function renderLessons(slideDirection = null) {
     scheduleSliderEl.innerHTML = '';
     if (slideDirection === 'left') {
@@ -223,14 +291,32 @@
     }
 
     const currentDayData = state.weekDays[state.selectedDay];
-    const lessons = currentDayData?.lessons || [];
+    const rawLessons = currentDayData?.lessons || [];
+
+    updateNextLessonBanner(rawLessons, currentDayData?.date);
+
+    // Apply Filter
+    let lessons = rawLessons;
+    if (state.activeFilter !== 'all') {
+      lessons = rawLessons.filter((l) => {
+        const t = (l.lesson_type || '').toLowerCase();
+        if (state.activeFilter === 'lecture') return t.includes('лекц') || t.includes('lecture');
+        if (state.activeFilter === 'practice') return t.includes('практ') || t.includes('practice');
+        if (state.activeFilter === 'lab') return t.includes('лаб') || t.includes('laboratory');
+        return true;
+      });
+    }
 
     if (lessons.length === 0) {
+      const subtitle =
+        rawLessons.length > 0
+          ? 'По выбранному фильтру занятий не найдено.'
+          : 'В этот день занятий не запланировано. Отличный повод отдохнуть!';
       scheduleSliderEl.innerHTML = `
         <div class="empty-day-state">
           <div class="empty-day-icon">🏖️</div>
-          <div class="empty-day-title">Пар нет!</div>
-          <div class="empty-day-subtitle">В этот день занятий не запланировано. Отличный повод отдохнуть или позаниматься своими делами.</div>
+          <div class="empty-day-title">${rawLessons.length > 0 ? 'Нет пар по фильтру' : 'Пар нет!'}</div>
+          <div class="empty-day-subtitle">${subtitle}</div>
         </div>
       `;
       return;
@@ -302,7 +388,6 @@
         : 'Группа';
     entitySubtitleEl.textContent = typeRu;
 
-    // Check favorite status
     const isFav =
       state.user &&
       state.user.favorite &&
@@ -322,7 +407,7 @@
     parityLabelEl.textContent = state.selectedWeek % 2 === 0 ? 'Чётная' : 'Нечётная';
   }
 
-  async function loadSchedule(entity, week = null, targetDay = null, slideDirection = null) {
+  async function loadSchedule(entity, week = null, targetDate = null, targetDay = null, slideDirection = null) {
     const targetWeek = week || state.selectedWeek;
     state.currentEntity = entity;
     updateHeader();
@@ -332,23 +417,32 @@
     }
 
     try {
-      const query = new URLSearchParams({
+      const params = {
         type: entity.type,
         uid: entity.uid,
         name: entity.name,
-        week: targetWeek,
         init_data: state.initData,
-      });
+      };
+      if (targetDate) {
+        params.date = targetDate;
+      } else {
+        params.week = targetWeek;
+      }
 
+      const query = new URLSearchParams(params);
       const res = await fetch(`/api/schedule?${query.toString()}`);
       if (!res.ok) throw new Error('Ошибка сети');
 
       const data = await res.json();
       state.weekDays = data.days || {};
+      state.datesSummary = data.dates_summary || state.datesSummary || {};
       state.selectedWeek = data.week || targetWeek;
       state.currentWeek = data.current_week || 1;
 
-      // Cache locally for instant 0ms offline startup
+      if (data.target_weekday && targetDay === null) {
+        state.selectedDay = Math.min(6, Math.max(1, data.target_weekday));
+      }
+
       try {
         localStorage.setItem(
           'cached_fav_schedule',
@@ -356,6 +450,7 @@
             entity: state.currentEntity,
             days: state.weekDays,
             week: state.selectedWeek,
+            datesSummary: state.datesSummary,
           })
         );
       } catch (e) {}
@@ -368,48 +463,174 @@
     }
   }
 
+  // Interactive Month Calendar Logic
+  function openCalendar() {
+    haptic('medium');
+    calendarModalEl.classList.remove('hidden');
 
-  async function initApp() {
-    // 1. Instant load from local cache if available (0 ms response!)
-    try {
-      const cached = localStorage.getItem('cached_fav_schedule');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.entity && parsed.days) {
-          state.currentEntity = parsed.entity;
-          state.weekDays = parsed.days;
-          state.selectedWeek = parsed.week || 1;
-          updateHeader();
-          updateWeekBar();
-          renderDayRibbon();
-          renderLessons();
-        }
+    // Default view to currently selected week date
+    const curDay = state.weekDays[state.selectedDay];
+    if (curDay && curDay.date) {
+      const parts = curDay.date.split('-').map(Number);
+      state.calYear = parts[0];
+      state.calMonth = parts[1] - 1;
+    } else {
+      const now = new Date();
+      state.calYear = now.getFullYear();
+      state.calMonth = now.getMonth();
+    }
+
+    renderCalendarGrid();
+  }
+
+  function closeCalendar() {
+    calendarModalEl.classList.add('hidden');
+  }
+
+  function getSemesterWeekForDate(d) {
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    let semStart;
+    if (m >= 8) {
+      semStart = new Date(y, 8, 1);
+    } else if (m < 2) {
+      semStart = new Date(y - 1, 8, 1);
+    } else {
+      semStart = new Date(y, 1, 9);
+    }
+    if (semStart.getDay() === 0) semStart.setDate(semStart.getDate() + 1);
+
+    const diffDays = Math.floor((d - semStart) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 1;
+    return Math.max(1, Math.min(24, Math.floor(diffDays / 7) + 1));
+  }
+
+  function renderCalendarGrid() {
+    calMonthLabelEl.textContent = `${MONTH_NAMES[state.calMonth]} ${state.calYear}`;
+    calendarGridEl.innerHTML = '';
+
+    const firstDayOfMonth = new Date(state.calYear, state.calMonth, 1);
+    const lastDayOfMonth = new Date(state.calYear, state.calMonth + 1, 0);
+
+    // Monday is 1, Sunday is 7
+    let startWd = firstDayOfMonth.getDay();
+    if (startWd === 0) startWd = 7;
+
+    const startDate = new Date(firstDayOfMonth);
+    startDate.setDate(firstDayOfMonth.getDate() - (startWd - 1));
+
+    const todayISO = new Date().toISOString().split('T')[0];
+    const curActiveDate = state.weekDays[state.selectedDay]?.date;
+
+    let rowDate = new Date(startDate);
+
+    // Render 5 or 6 weeks
+    for (let w = 0; w < 6; w++) {
+      if (w > 0 && rowDate.getMonth() !== state.calMonth && rowDate > lastDayOfMonth) {
+        break;
       }
-    } catch (e) {}
 
-    // Determine initial day based on today's weekday
-    const todayWd = new Date().getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    state.selectedDay = todayWd === 0 ? 1 : todayWd;
+      const rowEl = document.createElement('div');
+      rowEl.className = 'cal-row';
 
-    // 2. Fetch user profile and favorite
-    try {
-      const meRes = await fetch(`/api/me?init_data=${encodeURIComponent(state.initData)}`);
-      if (meRes.ok) {
-        state.user = await meRes.json();
-        if (state.user.favorite_item) {
-          await loadSchedule(state.user.favorite_item);
-          return;
+      // Week Number Column
+      const semWk = getSemesterWeekForDate(rowDate);
+      const wkCell = document.createElement('div');
+      wkCell.className = 'cal-wk-cell';
+      wkCell.textContent = semWk;
+      rowEl.appendChild(wkCell);
+
+      for (let day = 0; day < 7; day++) {
+        const cellDate = new Date(rowDate);
+        const y = cellDate.getFullYear();
+        const m = String(cellDate.getMonth() + 1).padStart(2, '0');
+        const d = String(cellDate.getDate()).padStart(2, '0');
+        const iso = `${y}-${m}-${d}`;
+
+        const isCurrentMonth = cellDate.getMonth() === state.calMonth;
+        const isToday = iso === todayISO;
+        const isActive = iso === curActiveDate;
+
+        const cell = document.createElement('div');
+        cell.className = `cal-day-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today-cal-day' : ''} ${isActive ? 'active-cal-day' : ''}`;
+
+        // Colored Dots
+        let dotsHtml = '';
+        const dayTypes = state.datesSummary[iso];
+        if (dayTypes && dayTypes.length > 0) {
+          const uniqueTypes = [...new Set(dayTypes)].slice(0, 4);
+          const dots = uniqueTypes
+            .map((t) => `<span class="cal-dot ${getDotClass(t)}"></span>`)
+            .join('');
+          dotsHtml = `<div class="cal-dots">${dots}</div>`;
         }
-      }
-    } catch (e) {}
 
-    // If no favorite loaded yet, show search modal
-    if (!state.currentEntity) {
-      openSearch();
+        cell.innerHTML = `
+          <span class="cal-date-num">${cellDate.getDate()}</span>
+          ${dotsHtml}
+        `;
+
+        cell.addEventListener('click', () => {
+          haptic('medium');
+          closeCalendar();
+          loadSchedule(state.currentEntity, null, iso);
+        });
+
+        rowEl.appendChild(cell);
+        rowDate.setDate(rowDate.getDate() + 1);
+      }
+
+      calendarGridEl.appendChild(rowEl);
     }
   }
 
-  // Event Listeners
+  // Filter Pills Handling
+  document.querySelectorAll('.filter-pill').forEach((pill) => {
+    pill.addEventListener('click', (e) => {
+      haptic('light');
+      document.querySelectorAll('.filter-pill').forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.activeFilter = pill.dataset.filter;
+      renderLessons();
+    });
+  });
+
+  // Calendar Event Listeners
+  btnCalendarEl.addEventListener('click', openCalendar);
+  weekInfoContainer.addEventListener('click', openCalendar);
+  calendarOverlayEl.addEventListener('click', closeCalendar);
+  calBtnCloseEl.addEventListener('click', closeCalendar);
+
+  calPrevMonthBtn.addEventListener('click', () => {
+    haptic('light');
+    state.calMonth--;
+    if (state.calMonth < 0) {
+      state.calMonth = 11;
+      state.calYear--;
+    }
+    renderCalendarGrid();
+  });
+
+  calNextMonthBtn.addEventListener('click', () => {
+    haptic('light');
+    state.calMonth++;
+    if (state.calMonth > 11) {
+      state.calMonth = 0;
+      state.calYear++;
+    }
+    renderCalendarGrid();
+  });
+
+  calBtnTodayEl.addEventListener('click', () => {
+    haptic('medium');
+    closeCalendar();
+    const todayISO = new Date().toISOString().split('T')[0];
+    const todayWd = new Date().getDay();
+    state.selectedDay = todayWd === 0 ? 1 : todayWd;
+    loadSchedule(state.currentEntity, null, todayISO);
+  });
+
+  // Week Arrows
   prevWeekBtn.addEventListener('click', () => {
     if (state.selectedWeek > 1) {
       haptic('light');
@@ -428,9 +649,11 @@
     haptic('medium');
     const todayWd = new Date().getDay();
     state.selectedDay = todayWd === 0 ? 1 : todayWd;
-    loadSchedule(state.currentEntity, state.currentWeek);
+    const todayISO = new Date().toISOString().split('T')[0];
+    loadSchedule(state.currentEntity, null, todayISO);
   });
 
+  // Favorite Star Toggle
   btnFavEl.addEventListener('click', async () => {
     if (!state.currentEntity) return;
     haptic('medium');
@@ -524,6 +747,44 @@
     }, 200);
   });
 
-  // Start the Mini App
+  async function initApp() {
+    // 1. Instant load from local cache if available (0 ms response!)
+    try {
+      const cached = localStorage.getItem('cached_fav_schedule');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.entity && parsed.days) {
+          state.currentEntity = parsed.entity;
+          state.weekDays = parsed.days;
+          state.datesSummary = parsed.datesSummary || {};
+          state.selectedWeek = parsed.week || 1;
+          updateHeader();
+          updateWeekBar();
+          renderDayRibbon();
+          renderLessons();
+        }
+      }
+    } catch (e) {}
+
+    const todayWd = new Date().getDay();
+    state.selectedDay = todayWd === 0 ? 1 : todayWd;
+
+    // 2. Fetch user profile and favorite
+    try {
+      const meRes = await fetch(`/api/me?init_data=${encodeURIComponent(state.initData)}`);
+      if (meRes.ok) {
+        state.user = await meRes.json();
+        if (state.user.favorite_item) {
+          await loadSchedule(state.user.favorite_item);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    if (!state.currentEntity) {
+      openSearch();
+    }
+  }
+
   initApp();
 })();

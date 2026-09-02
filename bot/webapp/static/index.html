@@ -18,7 +18,7 @@
     <header class="header">
       <div class="header-left">
         <button id="btnSearch" class="icon-btn" aria-label="Поиск">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
@@ -31,8 +31,16 @@
       </div>
 
       <div class="header-right">
+        <button id="btnCalendar" class="icon-btn" aria-label="Календарь">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </button>
         <button id="btnFav" class="icon-btn" aria-label="В избранное">
-          <svg id="starIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg id="starIcon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
           </svg>
         </button>
@@ -42,16 +50,17 @@
     <!-- Week Selector Bar -->
     <div class="week-bar">
       <button id="prevWeek" class="week-arrow-btn" aria-label="Предыдущая неделя">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
 
-      <div class="week-info" id="weekInfoContainer">
+      <div class="week-info" id="weekInfoContainer" title="Нажмите, чтобы открыть календарь">
         <span id="weekLabel" class="week-label">Неделя 1</span>
         <span id="parityLabel" class="parity-label">Нечётная</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
 
       <button id="nextWeek" class="week-arrow-btn" aria-label="Следующая неделя">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
 
       <button id="btnToday" class="today-badge">Сегодня</button>
@@ -62,17 +71,67 @@
       <!-- Generated in JS: Mon to Sat -->
     </nav>
 
+    <!-- Filter Pills (Лекции, Практики, Лабы) -->
+    <div class="filter-bar">
+      <button class="filter-pill active" data-filter="all">Все</button>
+      <button class="filter-pill" data-filter="lecture">Лекции</button>
+      <button class="filter-pill" data-filter="practice">Практики</button>
+      <button class="filter-pill" data-filter="lab">Лабы</button>
+    </div>
+
     <!-- Swipeable Days Container -->
     <main class="schedule-viewport" id="swipeArea">
+      <!-- Live countdown banner before next lesson -->
+      <div id="nextLessonBanner" class="next-lesson-banner hidden"></div>
+
       <div class="schedule-slider" id="scheduleSlider">
         <!-- Lessons rendered here -->
       </div>
     </main>
 
+    <!-- Month Calendar Modal -->
+    <div id="calendarModal" class="modal hidden">
+      <div class="modal-overlay" id="calendarOverlay"></div>
+      <div class="modal-content calendar-modal-content">
+        <div class="modal-handle"></div>
+        <div class="calendar-header">
+          <button id="calPrevMonth" class="icon-btn" aria-label="Предыдущий месяц">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span id="calMonthLabel" class="calendar-month-label">Сентябрь 2026</span>
+          <button id="calNextMonth" class="icon-btn" aria-label="Следующий месяц">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+        
+        <div class="calendar-weekdays">
+          <span class="cal-col-wk">№</span>
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span class="cal-sun">Вс</span>
+        </div>
+
+        <div class="calendar-grid" id="calendarGrid">
+          <!-- Dynamically populated month days with colored lesson dots -->
+        </div>
+
+        <div class="calendar-legend">
+          <div class="legend-item"><span class="legend-dot dot-lecture"></span>Лекция</div>
+          <div class="legend-item"><span class="legend-dot dot-practice"></span>Практика</div>
+          <div class="legend-item"><span class="legend-dot dot-lab"></span>Лаба</div>
+          <div class="legend-item"><span class="legend-dot dot-exam"></span>Экзамен</div>
+        </div>
+
+        <div class="calendar-actions">
+          <button id="calBtnToday" class="btn-action btn-outline">Сегодня</button>
+          <button id="calBtnClose" class="btn-action btn-primary">Готово</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Search Modal -->
     <div id="searchModal" class="modal hidden">
       <div class="modal-overlay" id="searchOverlay"></div>
       <div class="modal-content">
+        <div class="modal-handle"></div>
         <div class="modal-header">
           <input type="text" id="searchInput" placeholder="Группа, преподаватель или аудитория..." autocomplete="off">
           <button id="closeSearch" class="close-btn">&times;</button>

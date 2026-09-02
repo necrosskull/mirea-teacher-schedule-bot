@@ -120,12 +120,19 @@ async def test_webapp_api_endpoints():
         )
         mock_sched_service.get_schedule.return_value = ScheduleData(data=[lesson])
         mock_sched_service.get_lessons.return_value = []
+        mock_sched_service.get_dates_summary.return_value = {"2025-09-01": ["lecture"]}
 
         r_sched = await client.get("/api/schedule?type=group&uid=10&name=КТСО-01-22&week=1")
         assert r_sched.status_code == 200
         sched_json = r_sched.json()
         assert sched_json["item"]["name"] == "КТСО-01-22"
         assert "days" in sched_json
+        assert "dates_summary" in sched_json
+
+        # Test date parameter
+        r_date = await client.get("/api/schedule?type=group&uid=10&name=КТСО-01-22&date=2025-09-01")
+        assert r_date.status_code == 200
+
 
         # 7. /api/schedule with missing params -> 400
         r_bad = await client.get("/api/schedule")

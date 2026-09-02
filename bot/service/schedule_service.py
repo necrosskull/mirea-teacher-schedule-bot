@@ -176,3 +176,16 @@ class ScheduleService:
 
         lessons_list.sort(key=lambda x: (x.dates, x.lesson_bells.number))
         return lessons_list
+
+    def get_dates_summary(self, schedule: ScheduleData) -> dict[str, list[str]]:
+        summary: dict[str, list[str]] = {}
+        for item in schedule.data:
+            if isinstance(item, LessonSchedule) and item.dates:
+                l_type = item.lesson_type or "other"
+                for d in item.dates:
+                    d_str = d.isoformat()
+                    if d_str not in summary:
+                        summary[d_str] = []
+                    summary[d_str].append(l_type)
+        return summary
+

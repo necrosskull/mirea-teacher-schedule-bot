@@ -549,3 +549,264 @@ body {
   opacity: 0;
   transform: translate(-50%, 10px);
 }
+
+/* Filter Pills */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 16px 10px;
+  background-color: var(--bg-color);
+  border-bottom: 1px solid var(--card-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-pill {
+  background: var(--secondary-bg-color);
+  border: 1px solid var(--card-border);
+  color: var(--hint-color);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+
+.filter-pill:active {
+  transform: scale(0.95);
+}
+
+.filter-pill.active {
+  background-color: var(--button-color);
+  color: var(--button-text-color);
+  border-color: var(--button-color);
+}
+
+/* Next Lesson Banner */
+.next-lesson-banner {
+  background: linear-gradient(135deg, rgba(36, 129, 204, 0.12), rgba(52, 199, 89, 0.12));
+  border: 1px solid rgba(36, 129, 204, 0.25);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.next-lesson-banner.hidden {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Modal Handle */
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: var(--hint-color);
+  opacity: 0.4;
+  margin: 0 auto 12px;
+}
+
+/* Calendar Modal */
+.calendar-modal-content {
+  padding: 16px 16px 20px;
+  max-height: 88vh;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.calendar-month-label {
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: 28px repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hint-color);
+  margin-bottom: 8px;
+}
+
+.cal-col-wk {
+  color: var(--button-color);
+  opacity: 0.7;
+}
+
+.cal-sun {
+  color: #ff3b30;
+}
+
+.calendar-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.cal-row {
+  display: grid;
+  grid-template-columns: 28px repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-wk-cell {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hint-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--secondary-bg-color);
+  border-radius: 8px;
+  margin-right: 2px;
+}
+
+.cal-day-cell {
+  min-height: 42px;
+  padding: 4px 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: transparent;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.cal-day-cell:active {
+  transform: scale(0.9);
+}
+
+.cal-day-cell.other-month {
+  opacity: 0.28;
+}
+
+.cal-day-cell.today-cal-day {
+  font-weight: 800;
+  border: 1.5px solid var(--button-color);
+}
+
+.cal-day-cell.active-cal-day {
+  background-color: var(--button-color);
+  color: var(--button-text-color);
+}
+
+.cal-day-cell.active-cal-day .cal-date-num {
+  font-weight: 700;
+}
+
+.cal-date-num {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+/* Colored Dots for Lessons */
+.cal-dots {
+  display: flex;
+  gap: 2px;
+  margin-top: 3px;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  justify-content: center;
+}
+
+.cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-lecture { background-color: #1976d2; }
+.dot-practice { background-color: #8e24aa; }
+.dot-lab { background-color: #f57c00; }
+.dot-exam { background-color: #d32f2f; }
+.dot-other { background-color: #78909c; }
+
+.cal-day-cell.active-cal-day .cal-dot {
+  box-shadow: 0 0 2px #fff;
+}
+
+/* Legend */
+.calendar-legend {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 12px;
+  background-color: var(--secondary-bg-color);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: var(--hint-color);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* Actions */
+.calendar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-action {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.btn-action:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background-color: var(--button-color);
+  color: var(--button-text-color);
+}
+
+.btn-outline {
+  background-color: var(--secondary-bg-color);
+  color: var(--text-color);
+  border: 1px solid var(--card-border);
+}
+

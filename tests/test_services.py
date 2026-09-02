@@ -164,4 +164,11 @@ def test_schedule_service_get_lessons_sorting_and_filtering():
     # Check fetch_get_lessons produces identical results
     fetch_res = fetch_get_lessons(schedule, dates=[date(2025, 9, 2)])
     assert len(fetch_res) == 1
+
+    # Check dates_summary
+    summary = svc.get_dates_summary(schedule)
+    assert "2025-09-01" in summary
+    assert "2025-09-02" in summary
+    assert len(summary["2025-09-01"]) == 2
+
     assert fetch_res[0].subject == "Первая пара"
