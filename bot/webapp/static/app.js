@@ -288,6 +288,18 @@
 
     // State 1: A lesson is currently underway!
     if (currentLesson) {
+      const existingCurrent = liveDayWidgetEl.querySelector('.live-widget.current-state');
+      if (existingCurrent) {
+        const countdownEl = existingCurrent.querySelector('.live-countdown');
+        const expectedCountdown = `⏳ Осталось ${remainingMins} мин`;
+        if (countdownEl && countdownEl.textContent !== expectedCountdown) {
+          countdownEl.textContent = expectedCountdown;
+        }
+        const fillEl = existingCurrent.querySelector('.live-progress-fill');
+        if (fillEl) fillEl.style.width = `${progressPercent}%`;
+        return;
+      }
+
       const room = currentLesson.classrooms && currentLesson.classrooms[0] ? `🏫 ${currentLesson.classrooms[0]}` : '';
       const teacher = currentLesson.teachers && currentLesson.teachers[0] ? `👨🏻‍🏫 ${currentLesson.teachers[0]}` : '';
       const nextSnippet = nextLesson
@@ -320,6 +332,16 @@
     }
     // State 2: Break between classes (Перемена!)
     else if (nextLesson && lastPastLesson) {
+      const existingBreak = liveDayWidgetEl.querySelector('.live-widget.break-state');
+      if (existingBreak) {
+        const countdownEl = existingBreak.querySelector('.live-countdown');
+        const expectedCountdown = `До звонка ${minsUntilNext} мин`;
+        if (countdownEl && countdownEl.textContent !== expectedCountdown) {
+          countdownEl.textContent = expectedCountdown;
+        }
+        return;
+      }
+
       const room = nextLesson.classrooms && nextLesson.classrooms[0] ? `🏫 ${nextLesson.classrooms[0]}` : '';
       const teacher = nextLesson.teachers && nextLesson.teachers[0] ? `👨🏻‍🏫 ${nextLesson.teachers[0]}` : '';
 
@@ -343,11 +365,22 @@
     }
     // State 3: Before first lesson today
     else if (nextLesson && !lastPastLesson) {
-      const room = nextLesson.classrooms && nextLesson.classrooms[0] ? `🏫 ${nextLesson.classrooms[0]}` : '';
       const timeFmt =
         minsUntilNext > 60
           ? `${Math.floor(minsUntilNext / 60)} ч ${minsUntilNext % 60} мин`
           : `${minsUntilNext} мин`;
+
+      const existingBefore = liveDayWidgetEl.querySelector('.live-widget.before-state');
+      if (existingBefore) {
+        const countdownEl = existingBefore.querySelector('.live-countdown');
+        const expectedCountdown = `Через ${timeFmt}`;
+        if (countdownEl && countdownEl.textContent !== expectedCountdown) {
+          countdownEl.textContent = expectedCountdown;
+        }
+        return;
+      }
+
+      const room = nextLesson.classrooms && nextLesson.classrooms[0] ? `🏫 ${nextLesson.classrooms[0]}` : '';
 
       liveDayWidgetEl.innerHTML = `
         <div class="live-widget before-state" id="activeLiveCard">
@@ -368,6 +401,9 @@
     }
     // State 4: All lessons finished for today
     else if (!currentLesson && !nextLesson && rawLessons.length > 0) {
+      const existingDone = liveDayWidgetEl.querySelector('.live-widget.done-state');
+      if (existingDone) return;
+
       liveDayWidgetEl.innerHTML = `
         <div class="live-widget done-state">
           <div class="live-widget-top">
@@ -383,6 +419,7 @@
         </div>
       `;
     }
+
 
     const card = document.getElementById('activeLiveCard');
     if (card) {
@@ -1062,14 +1099,35 @@
   }
 
 
-  // Live status ticker: recalculates progress bars and timers every 10 seconds
+  // Live status ticker: recalculates progress bars and timers every 10 seconds without rebuilding DOM
   setInterval(() => {
     const currentDayData = state.weekDays[state.selectedDay];
     const todayISO = new Date().toISOString().split('T')[0];
-    if (currentDayData?.date === todayISO) {
-      renderLessons();
+    if (currentDayData?.date !== todayISO) return;
+
+    const rawLessons = currentDayData?.lessons || [];
+    updateLiveDayWidget(rawLessons, currentDayData?.date);
+
+    // Update active lesson card in place
+    const now = new Date();
+    for (const l of rawLessons) {
+      const { start, end } = getLessonTimes(l.start_time, l.end_time);
+      if (now >= start && now <= end) {
+        const totalMs = end - start;
+        const elapsedMs = now - start;
+        const pct = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
+        const rem = Math.max(1, Math.round((end - now) / 60000));
+        const activeCard = scheduleSliderEl.querySelector('.lesson-card.active-lesson');
+        if (activeCard) {
+          const prog = activeCard.querySelector('.card-live-progress');
+          if (prog) prog.style.width = `${pct}%`;
+          const badge = activeCard.querySelector('.now-badge');
+          if (badge) badge.innerHTML = `<span class="pulse-dot"></span>Идет (${rem} мин)`;
+        }
+      }
     }
   }, 10000);
+
 
   initApp();
 })();
