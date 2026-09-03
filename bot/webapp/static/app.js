@@ -3,6 +3,9 @@
   if (tg) {
     tg.ready();
     tg.expand();
+    if (typeof tg.disableVerticalSwipes === 'function') {
+      tg.disableVerticalSwipes();
+    }
   }
 
   function haptic(type = 'light') {
@@ -181,6 +184,96 @@
     renderLessons(direction);
   }
 
+  // Swipe horizontally on day ribbon / week bar to switch entire week
+  function setupWeekSwipe(element) {
+    if (!element) return;
+    let startX = 0;
+    let startY = 0;
+    let isSwiping = false;
+    let hasSwiped = false;
+
+    function onStart(e) {
+      const point = e.touches ? e.touches[0] : e;
+      startX = point.clientX;
+      startY = point.clientY;
+      isSwiping = false;
+      hasSwiped = false;
+    }
+
+    function onMove(e) {
+      if (e.touches && e.touches.length > 1) return;
+      const point = e.touches ? e.touches[0] : e;
+      const dx = point.clientX - startX;
+      const dy = point.clientY - startY;
+
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        isSwiping = true;
+        if (e.cancelable) e.preventDefault();
+      }
+    }
+
+    function onEnd(e) {
+      if (!isSwiping) return;
+      isSwiping = false;
+      const point = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = point.clientX - startX;
+      const dy = point.clientY - startY;
+
+      if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        hasSwiped = true;
+        setTimeout(() => {
+          hasSwiped = false;
+        }, 120);
+
+        if (dx < 0) {
+          // Swipe Left -> Next Week
+          if (state.selectedWeek < 24) {
+            haptic('medium');
+            loadSchedule(state.currentEntity, state.selectedWeek + 1, null, state.selectedDay, 'left');
+            showToast(`Неделя ${state.selectedWeek + 1}`);
+          } else {
+            showToast('Последняя неделя семестра');
+          }
+        } else {
+          // Swipe Right -> Previous Week
+          if (state.selectedWeek > 1) {
+            haptic('medium');
+            loadSchedule(state.currentEntity, state.selectedWeek - 1, null, state.selectedDay, 'right');
+            showToast(`Неделя ${state.selectedWeek - 1}`);
+          } else {
+            showToast('Первая неделя семестра');
+          }
+        }
+      }
+    }
+
+    element.addEventListener('touchstart', onStart, { passive: true });
+    element.addEventListener('touchmove', onMove, { passive: false });
+    element.addEventListener('touchend', onEnd);
+    element.addEventListener('touchcancel', () => { isSwiping = false; });
+
+    element.addEventListener('mousedown', onStart);
+    window.addEventListener('mousemove', (e) => {
+      if (e.buttons === 1) onMove(e);
+    });
+    window.addEventListener('mouseup', onEnd);
+
+    // Suppress child click if a horizontal swipe was performed
+    element.addEventListener(
+      'click',
+      (e) => {
+        if (hasSwiped) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      },
+      true
+    );
+  }
+
+  setupWeekSwipe(dayRibbonEl);
+  setupWeekSwipe(document.querySelector('.week-bar'));
+
   function getLocalDateISO(d = new Date()) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -335,7 +428,11 @@
     // State 1: A lesson is currently underway!
     if (currentLesson) {
       const existingCurrent = liveDayWidgetEl.querySelector('.live-widget.current-state');
-      if (existingCurrent) {
+      if (
+        existingCurrent &&
+        existingCurrent.dataset.lessonNum == currentLesson.number &&
+        existingCurrent.dataset.lessonSubject === (currentLesson.subject || '')
+      ) {
         const countdownEl = existingCurrent.querySelector('.live-countdown');
         const expectedCountdown = `⏳ Осталось ${remainingMins} мин`;
         if (countdownEl && countdownEl.textContent !== expectedCountdown) {
@@ -356,7 +453,7 @@
         : '';
 
       liveDayWidgetEl.innerHTML = `
-        <div class="live-widget current-state" id="activeLiveCard">
+        <div class="live-widget current-state" id="activeLiveCard" data-lesson-num="${currentLesson.number}" data-lesson-subject="${currentLesson.subject || ''}">
           <div class="live-widget-top">
             <div class="live-pill live-pill-green">
               <span class="pulse-dot"></span>
@@ -379,7 +476,10 @@
     // State 2: Break between classes (Перемена!)
     else if (nextLesson && lastPastLesson) {
       const existingBreak = liveDayWidgetEl.querySelector('.live-widget.break-state');
-      if (existingBreak) {
+      if (
+        existingBreak &&
+        existingBreak.dataset.nextNum == nextLesson.number
+      ) {
         const countdownEl = existingBreak.querySelector('.live-countdown');
         const expectedCountdown = `До звонка ${minsUntilNext} мин`;
         if (countdownEl && countdownEl.textContent !== expectedCountdown) {
@@ -392,7 +492,7 @@
       const teacher = nextLesson.teachers && nextLesson.teachers[0] ? `👨🏻‍🏫 ${nextLesson.teachers[0]}` : '';
 
       liveDayWidgetEl.innerHTML = `
-        <div class="live-widget break-state" id="activeLiveCard">
+        <div class="live-widget break-state" id="activeLiveCard" data-next-num="${nextLesson.number}">
           <div class="live-widget-top">
             <div class="live-pill live-pill-orange">
               <span>☕</span>
@@ -417,7 +517,10 @@
           : `${minsUntilNext} мин`;
 
       const existingBefore = liveDayWidgetEl.querySelector('.live-widget.before-state');
-      if (existingBefore) {
+      if (
+        existingBefore &&
+        existingBefore.dataset.nextNum == nextLesson.number
+      ) {
         const countdownEl = existingBefore.querySelector('.live-countdown');
         const expectedCountdown = `Через ${timeFmt}`;
         if (countdownEl && countdownEl.textContent !== expectedCountdown) {
@@ -429,7 +532,7 @@
       const room = nextLesson.classrooms && nextLesson.classrooms[0] ? `🏫 ${nextLesson.classrooms[0]}` : '';
 
       liveDayWidgetEl.innerHTML = `
-        <div class="live-widget before-state" id="activeLiveCard">
+        <div class="live-widget before-state" id="activeLiveCard" data-next-num="${nextLesson.number}">
           <div class="live-widget-top">
             <div class="live-pill live-pill-blue">
               <span>🌅</span>
@@ -523,65 +626,10 @@
       return;
     }
 
-    const now = new Date();
-    const todayISO = getLocalDateISO(now);
-    const isToday = currentDayData?.date === todayISO;
-
-
-    // Find current and next lesson among rawLessons
-    let currentLessonObj = null;
-    let nextLessonObj = null;
-    let curProgress = 0;
-    let curRemaining = 0;
-
-    if (isToday) {
-      for (const l of rawLessons) {
-        const { start, end } = getLessonTimes(l.start_time, l.end_time);
-        if (now >= start && now <= end) {
-          currentLessonObj = l;
-          const totalMs = end - start;
-          const elapsedMs = now - start;
-          curProgress = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
-          curRemaining = Math.max(1, Math.round((end - now) / 60000));
-        } else if (now < start && !nextLessonObj) {
-          nextLessonObj = l;
-        }
-      }
-    }
-
     lessons.forEach((lesson) => {
-      let cardClass = 'lesson-card';
-      let statusBadge = '';
-      let progressLineHtml = '';
-
-      if (isToday) {
-        const { start, end } = getLessonTimes(lesson.start_time, lesson.end_time);
-        const isNow = lesson === currentLessonObj;
-        const isNext = lesson === nextLessonObj;
-        const isPast = now > end;
-
-        if (isNow) {
-          cardClass += ' active-lesson';
-          progressLineHtml = `<div class="card-live-progress" style="width: ${curProgress}%"></div>`;
-          statusBadge = `<span class="now-badge"><span class="pulse-dot"></span>Идет (${curRemaining} мин)</span>`;
-        } else if (isNext) {
-          cardClass += ' next-lesson-card';
-          const minsUntil = Math.max(1, Math.round((start - now) / 60000));
-          statusBadge = `<span class="next-badge">⏱️ Следующая (${minsUntil} мин)</span>`;
-        } else if (isPast) {
-          cardClass += ' past-lesson-card';
-          statusBadge = `<span class="past-badge">✓ Прошла</span>`;
-        }
-      }
-
-      if (!statusBadge) {
-        const badgeClass = getTypeBadgeClass(lesson.lesson_type);
-        const typeName = getTypeDisplayName(lesson.lesson_type);
-        statusBadge = `<span class="lesson-type-badge ${badgeClass}">${typeName}</span>`;
-      }
-
       const card = document.createElement('div');
-      card.className = cardClass;
+      card.className = 'lesson-card';
+      card._lesson = lesson;
 
       let detailsHtml = '';
       if (lesson.teachers && lesson.teachers.length > 0) {
@@ -610,19 +658,110 @@
       }
 
       card.innerHTML = `
-        ${progressLineHtml}
         <div class="lesson-card-header">
           <div class="lesson-time-wrap">
             <span class="lesson-number">${lesson.number}</span>
             <span class="lesson-time">${lesson.start_time} – ${lesson.end_time}</span>
           </div>
-          ${statusBadge}
+          <div class="card-status-wrap"></div>
         </div>
         <div class="lesson-subject">${lesson.subject}</div>
         <div class="lesson-details">${detailsHtml}</div>
       `;
 
       scheduleSliderEl.appendChild(card);
+    });
+
+    updateLessonCardsLive();
+  }
+
+  function updateLessonCardsLive() {
+    const currentDayData = state.weekDays[state.selectedDay];
+    const todayISO = getLocalDateISO();
+    const isToday = currentDayData?.date === todayISO;
+    const rawLessons = currentDayData?.lessons || [];
+    const now = new Date();
+
+    let nextStartTime = null;
+
+    if (isToday) {
+      for (const l of rawLessons) {
+        const { start } = getLessonTimes(l.start_time, l.end_time);
+        if (now < start) {
+          if (nextStartTime === null || start < nextStartTime) {
+            nextStartTime = start;
+          }
+        }
+      }
+    }
+
+    const cards = scheduleSliderEl.querySelectorAll('.lesson-card');
+    cards.forEach((card) => {
+      const lesson = card._lesson;
+      if (!lesson) return;
+
+      const statusWrap = card.querySelector('.card-status-wrap');
+      if (!statusWrap) return;
+
+      if (!isToday) {
+        card.classList.remove('active-lesson', 'next-lesson-card', 'past-lesson-card');
+        const prog = card.querySelector('.card-live-progress');
+        if (prog) prog.remove();
+
+        const badgeClass = getTypeBadgeClass(lesson.lesson_type);
+        const typeName = getTypeDisplayName(lesson.lesson_type);
+        const targetHtml = `<span class="lesson-type-badge ${badgeClass}">${typeName}</span>`;
+        if (statusWrap.innerHTML !== targetHtml) {
+          statusWrap.innerHTML = targetHtml;
+        }
+        return;
+      }
+
+      const { start, end } = getLessonTimes(lesson.start_time, lesson.end_time);
+      const isNow = now >= start && now <= end;
+      const isNext = !isNow && nextStartTime !== null && start.getTime() === nextStartTime.getTime();
+      const isPast = now > end;
+
+      // Update card classes
+      card.classList.toggle('active-lesson', isNow);
+      card.classList.toggle('next-lesson-card', isNext);
+      card.classList.toggle('past-lesson-card', isPast);
+
+      // Update progress bar
+      let prog = card.querySelector('.card-live-progress');
+      if (isNow) {
+        const totalMs = end - start;
+        const elapsedMs = now - start;
+        const pct = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
+        if (!prog) {
+          prog = document.createElement('div');
+          prog.className = 'card-live-progress';
+          card.prepend(prog);
+        }
+        prog.style.width = `${pct}%`;
+      } else if (prog) {
+        prog.remove();
+      }
+
+      // Update badge
+      let targetHtml = '';
+      if (isNow) {
+        const curRemaining = Math.max(1, Math.round((end - now) / 60000));
+        targetHtml = `<span class="now-badge"><span class="pulse-dot"></span>Идет (${curRemaining} мин)</span>`;
+      } else if (isNext) {
+        const minsUntil = Math.max(1, Math.round((start - now) / 60000));
+        targetHtml = `<span class="next-badge">⏱️ Следующая (${minsUntil} мин)</span>`;
+      } else if (isPast) {
+        targetHtml = `<span class="past-badge">✓ Прошла</span>`;
+      } else {
+        const badgeClass = getTypeBadgeClass(lesson.lesson_type);
+        const typeName = getTypeDisplayName(lesson.lesson_type);
+        targetHtml = `<span class="lesson-type-badge ${badgeClass}">${typeName}</span>`;
+      }
+
+      if (statusWrap.innerHTML !== targetHtml) {
+        statusWrap.innerHTML = targetHtml;
+      }
     });
   }
 
@@ -1003,6 +1142,7 @@
 
   function closeSearch() {
     searchModalEl.classList.add('hidden');
+    if (searchInputEl) searchInputEl.blur();
   }
 
   btnSearchEl.addEventListener('click', openSearch);
@@ -1206,6 +1346,133 @@
   adminModalEl.addEventListener('click', (e) => {
     if (e.target === adminModalEl) closeAdminModal();
   });
+  function setupModalSwipeToClose(modalEl, closeFn) {
+    if (!modalEl) return;
+    const contentEl = modalEl.querySelector('.modal-content');
+    const overlayEl = modalEl.querySelector('.modal-overlay');
+    const handleEl = modalEl.querySelector('.modal-handle');
+    if (!contentEl) return;
+
+    let startY = 0;
+    let startX = 0;
+    let currentY = 0;
+    let isDragging = false;
+    let canDrag = false;
+    let startTime = 0;
+
+    function onStart(e) {
+      if (modalEl.classList.contains('hidden')) return;
+
+      // Don't intercept clicks/taps on inputs, buttons, calendar grid, etc.
+      if (e.target.closest('input, textarea, button, select, a, .calendar-grid, .calendar-actions')) {
+        return;
+      }
+
+      // Check if touching handle or if scrollable container is at top
+      const isHandle = Boolean(handleEl && (e.target === handleEl || handleEl.contains(e.target)));
+      const scrollable = contentEl.querySelector('.search-results, .admin-modal-body') || contentEl;
+      const isAtTop = scrollable.scrollTop <= 0;
+
+      if (!isHandle && !isAtTop) {
+        return;
+      }
+
+      const point = e.touches ? e.touches[0] : e;
+      startY = point.clientY;
+      startX = point.clientX;
+      currentY = startY;
+      startTime = Date.now();
+      canDrag = true;
+      isDragging = false;
+    }
+
+    function onMove(e) {
+      if (!canDrag) return;
+      const point = e.touches ? e.touches[0] : e;
+      const dy = point.clientY - startY;
+      const dx = point.clientX - startX;
+
+      if (!isDragging) {
+        // Detect intentional downward pull vs horizontal swipe or upward scroll
+        if (dy > 8 && dy > Math.abs(dx) * 1.2) {
+          isDragging = true;
+        } else if (Math.abs(dx) > 8 || dy < -8) {
+          canDrag = false;
+          return;
+        }
+      }
+
+      if (isDragging) {
+        if (e.cancelable) e.preventDefault();
+        currentY = point.clientY;
+        const dragDist = Math.max(0, dy);
+        contentEl.style.transition = 'none';
+        contentEl.style.transform = `translateY(${dragDist}px)`;
+        if (overlayEl) {
+          overlayEl.style.transition = 'none';
+          const maxDist = contentEl.offsetHeight || 300;
+          overlayEl.style.opacity = Math.max(0, 1 - (dragDist / maxDist) * 0.75);
+        }
+      }
+    }
+
+    function onEnd() {
+      if (!canDrag && !isDragging) return;
+      canDrag = false;
+
+      if (isDragging) {
+        isDragging = false;
+        const dy = currentY - startY;
+        const dt = Math.max(1, Date.now() - startTime);
+        const velocity = dy / dt; // px per ms
+
+        const threshold = Math.min(120, (contentEl.offsetHeight || 300) * 0.25);
+        if (dy > threshold || (dy > 40 && velocity > 0.4)) {
+          haptic('light');
+          contentEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+          contentEl.style.transform = 'translateY(100%)';
+          if (overlayEl) {
+            overlayEl.style.transition = 'opacity 0.22s ease';
+            overlayEl.style.opacity = '0';
+          }
+          setTimeout(() => {
+            closeFn();
+            contentEl.style.transform = '';
+            contentEl.style.transition = '';
+            if (overlayEl) {
+              overlayEl.style.opacity = '';
+              overlayEl.style.transition = '';
+            }
+          }, 220);
+        } else {
+          // Snap back
+          contentEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+          contentEl.style.transform = '';
+          if (overlayEl) {
+            overlayEl.style.transition = 'opacity 0.22s ease';
+            overlayEl.style.opacity = '';
+          }
+          setTimeout(() => {
+            contentEl.style.transition = '';
+            if (overlayEl) overlayEl.style.transition = '';
+          }, 220);
+        }
+      }
+    }
+
+    contentEl.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
+
+    contentEl.addEventListener('mousedown', onStart);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+  }
+
+  setupModalSwipeToClose(calendarModalEl, closeCalendar);
+  setupModalSwipeToClose(searchModalEl, closeSearch);
+  setupModalSwipeToClose(adminModalEl, closeAdminModal);
 
 
   async function loadAdminStats() {
@@ -1501,28 +1768,9 @@
     const todayISO = getLocalDateISO();
     if (currentDayData?.date !== todayISO) return;
 
-
     const rawLessons = currentDayData?.lessons || [];
     updateLiveDayWidget(rawLessons, currentDayData?.date);
-
-    // Update active lesson card in place
-    const now = new Date();
-    for (const l of rawLessons) {
-      const { start, end } = getLessonTimes(l.start_time, l.end_time);
-      if (now >= start && now <= end) {
-        const totalMs = end - start;
-        const elapsedMs = now - start;
-        const pct = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
-        const rem = Math.max(1, Math.round((end - now) / 60000));
-        const activeCard = scheduleSliderEl.querySelector('.lesson-card.active-lesson');
-        if (activeCard) {
-          const prog = activeCard.querySelector('.card-live-progress');
-          if (prog) prog.style.width = `${pct}%`;
-          const badge = activeCard.querySelector('.now-badge');
-          if (badge) badge.innerHTML = `<span class="pulse-dot"></span>Идет (${rem} мин)`;
-        }
-      }
-    }
+    updateLessonCardsLive();
   }, 10000);
 
 

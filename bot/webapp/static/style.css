@@ -138,6 +138,9 @@ body {
   padding: 8px 16px;
   background-color: var(--secondary-bg-color);
   border-bottom: 1px solid var(--card-border);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .week-arrow-btn {
@@ -203,6 +206,9 @@ body {
   border-bottom: 1px solid var(--card-border);
   overflow-x: auto;
   scrollbar-width: none;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .day-ribbon::-webkit-scrollbar {
@@ -316,6 +322,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.card-status-wrap {
+  display: flex;
+  align-items: center;
 }
 
 .lesson-time-wrap {
@@ -821,6 +832,24 @@ body {
   background-color: var(--hint-color);
   opacity: 0.4;
   margin: 0 auto 12px;
+  cursor: grab;
+  position: relative;
+  touch-action: none;
+  transition: opacity 0.15s ease;
+}
+
+.modal-handle::after {
+  content: '';
+  position: absolute;
+  top: -12px;
+  bottom: -12px;
+  left: -30px;
+  right: -30px;
+}
+
+.modal-handle:active {
+  cursor: grabbing;
+  opacity: 0.7;
 }
 
 /* Calendar Modal */
