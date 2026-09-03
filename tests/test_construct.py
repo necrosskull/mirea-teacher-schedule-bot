@@ -142,6 +142,14 @@ def test_construct_markups_with_webapp_button():
         ]
         assert len(empty_webapp_btns) == 0
 
+        # With item but is_inline=True: button is NOT present
+        markup_inline = construct_weeks_markup(item=item, is_inline=True)
+        inline_webapp_btns = [
+            btn for row in markup_inline.inline_keyboard for btn in row if btn.web_app
+        ]
+        assert len(inline_webapp_btns) == 0
+
+
         # In workdays (days of week selection): button is NOT present
         schedule = ScheduleData(data=[])
         markup_days = construct_workdays(week=3, schedule=schedule)

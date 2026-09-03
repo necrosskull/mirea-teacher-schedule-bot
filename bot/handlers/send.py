@@ -2,7 +2,8 @@ import datetime as dt
 
 from aiogram import Bot
 
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+
 
 from bot.fetch.models import SearchItem
 from bot.fetch.schedule import get_lessons
@@ -33,6 +34,15 @@ async def _edit_callback_message(
     reply_markup=None,
 ):
     if callback.inline_message_id:
+        # Inline messages NEVER support WebApp buttons in Telegram API!
+        if reply_markup and hasattr(reply_markup, "inline_keyboard"):
+            clean_rows = []
+            for row in reply_markup.inline_keyboard:
+                clean_row = [btn for btn in row if getattr(btn, "web_app", None) is None]
+                if clean_row:
+                    clean_rows.append(clean_row)
+            reply_markup = InlineKeyboardMarkup(inline_keyboard=clean_rows)
+
         await callback.bot.edit_message_text(
             text=text,
             inline_message_id=callback.inline_message_id,
@@ -40,6 +50,7 @@ async def _edit_callback_message(
         )
     elif callback.message:
         await callback.message.edit_text(text=text, reply_markup=reply_markup)
+
 
 
 async def send_item_clarity(
@@ -92,6 +103,8 @@ async def send_week_selector(
 
     text = f"{type_text}\n🗓️ Выберите неделю:"
 
+    is_inline = bool(getattr(event, "inline_message_id", None)) or bool(user_data.get("is_inline", False))
+
     if firsttime:
         if chat_id is None:
             return st.GETWEEK
@@ -99,7 +112,7 @@ async def send_week_selector(
         message = await bot.send_message(
             chat_id=chat_id,
             text=text,
-            reply_markup=construct.construct_weeks_markup(selected_item),
+            reply_markup=construct.construct_weeks_markup(selected_item, is_inline=is_inline),
         )
         _register_message_id(user_data, message.message_id)
 
@@ -107,8 +120,9 @@ async def send_week_selector(
         await _edit_callback_message(
             event,
             text=text,
-            reply_markup=construct.construct_weeks_markup(selected_item),
+            reply_markup=construct.construct_weeks_markup(selected_item, is_inline=is_inline),
         )
+
 
 
     return st.GETWEEK

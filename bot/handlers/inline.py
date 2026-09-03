@@ -149,8 +149,10 @@ async def answer_inline_handler(chosen_inline_result: ChosenInlineResult, state:
             "inline_message_id": chosen_inline_result.inline_message_id,
             "inline_message_ids": [chosen_inline_result.inline_message_id],
             "message_id": chosen_inline_result.inline_message_id,
+            "is_inline": True,
             "step": st.GETWEEK,
         }
+
 
         if len(inline_sessions) > 30:
             keys = list(inline_sessions.keys())[-30:]
