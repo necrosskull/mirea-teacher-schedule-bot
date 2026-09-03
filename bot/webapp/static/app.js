@@ -1363,17 +1363,18 @@
     function onStart(e) {
       if (modalEl.classList.contains('hidden')) return;
 
-      // Don't intercept clicks/taps on inputs, buttons, calendar grid, etc.
-      if (e.target.closest('input, textarea, button, select, a, .calendar-grid, .calendar-actions')) {
+      // Don't intercept clicks/taps on inputs, buttons, calendar grid, tabs, etc.
+      if (e.target.closest('input, textarea, button, select, a, .calendar-grid, .calendar-actions, .admin-tabs')) {
         return;
       }
 
-      // Check if touching handle or if scrollable container is at top
+      // Drag to close is ONLY initiated from the handle, header area, or empty search placeholder
       const isHandle = Boolean(handleEl && (e.target === handleEl || handleEl.contains(e.target)));
-      const scrollable = contentEl.querySelector('.search-results, .admin-modal-body') || contentEl;
-      const isAtTop = scrollable.scrollTop <= 0;
+      const isHeader = Boolean(e.target.closest('.modal-header, .admin-modal-header, .calendar-header'));
+      const isSearchPlaceholder = Boolean(e.target.closest('.search-placeholder'));
 
-      if (!isHandle && !isAtTop) {
+      // If user touches body or content area, do NOT drag modal so native scrolling works 100% reliably
+      if (!isHandle && !isHeader && !isSearchPlaceholder) {
         return;
       }
 
