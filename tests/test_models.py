@@ -11,9 +11,8 @@ from bot.fetch.models import (
     LessonBells,
     LessonSchedule,
     ScheduleData,
-    ScheduleEndpoints,
+    ScheduleTargetType,
     SearchItem,
-    SearchResults,
     Teacher,
     validate_dates,
 )
@@ -33,10 +32,12 @@ def test_search_item_singularize_type():
     assert item4.type == "teacher"
 
 
-def test_schedule_endpoints():
-    assert ScheduleEndpoints.teachers.value == "teachers"
-    assert ScheduleEndpoints.groups.value == "groups"
-    assert ScheduleEndpoints.classrooms.value == "classrooms"
+def test_schedule_target_types():
+    assert {target.value for target in ScheduleTargetType} == {
+        "group",
+        "teacher",
+        "classroom",
+    }
 
 
 def test_campus_model():
@@ -142,13 +143,69 @@ def test_schedule_data():
     assert len(sd.data) == 2
 
 
-def test_search_results_iteration():
-    sr = SearchResults(
-        teachers=[SearchItem(type="teacher", uid=1, name="T1")],
-        groups=[SearchItem(type="group", uid=2, name="G1")],
-        classrooms=None,
+def test_schedule_data_from_wire_splits_item_kinds():
+    payload = [
+        {
+            "type": "__lesson_schedule__",
+            "subject": "Физика",
+            "lesson_bells": {"number": 1, "start_time": "09:00", "end_time": "10:30"},
+            "dates": ["01-09-2026"],
+            "teachers": [{"name": "Иванов А. Д.", "uid": "539"}],
+            "groups": ["ИКБО-10-23"],
+            "classrooms": [{"name": "А-1 (В-78)"}],
+        },
+        {"type": "__holiday__", "title": "День знаний", "dates": ["01-09-2026"]},
+        {
+            "type": "__calendar_event__",
+            "kind": "event",
+            "title": "Конференция",
+            "dates": ["02-09-2026"],
+            "is_all_day": True,
+        },
+        {"type": "__something_new__", "title": "Ignored"},
+    ]
+
+    data = ScheduleData.from_wire(payload)
+
+    assert len(data.data) == 3
+    assert isinstance(data.data[0], LessonSchedule)
+    assert data.data[0].teachers[0].name == "Иванов А. Д."
+    assert isinstance(data.data[1], Holiday)
+    assert data.data[1].dates == [date(2026, 9, 1)]
+    assert data.data[2].title == "Конференция"
+
+
+def test_schedule_data_from_wire_accepts_lessons_without_type():
+    data = ScheduleData.from_wire(
+        [
+            {
+                "subject": "Математика",
+                "lesson_bells": {"number": 2, "start_time": "10:40", "end_time": "12:10"},
+                "dates": ["01-09-2026"],
+            }
+        ]
     )
-    items = [item for _, val in sr if val for item in val]
-    assert len(items) == 2
-    assert items[0].name == "T1"
-    assert items[1].name == "G1"
+    assert len(data.data) == 1
+    assert isinstance(data.data[0], LessonSchedule)
+
+
+def test_schedule_data_from_wire_skips_malformed_items():
+    data = ScheduleData.from_wire(
+        [
+            {"type": "__lesson_schedule__", "subject": "No bells", "dates": ["01-09-2026"]},
+            {
+                "type": "__lesson_schedule__",
+                "subject": "Broken date",
+                "lesson_bells": {"number": 1},
+                "dates": ["not-a-date"],
+            },
+            {
+                "type": "__lesson_schedule__",
+                "subject": "Fine",
+                "lesson_bells": {"number": 1},
+                "dates": ["01-09-2026"],
+            },
+        ]
+    )
+    assert len(data.data) == 1
+    assert data.data[0].subject == "Fine"

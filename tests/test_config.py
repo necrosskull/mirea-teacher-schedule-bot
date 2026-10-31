@@ -1,4 +1,7 @@
 import os
+from pathlib import Path
+
+import bot.config
 from bot.config import Config, parse_admins
 
 
@@ -21,17 +24,51 @@ def test_parse_admins_with_invalid_items():
 
 def test_config_instance(monkeypatch):
     monkeypatch.setenv("TOKEN", "test_token_123")
-    monkeypatch.setenv("API_URL", "https://schedule-of-mirea.example.com")
+    monkeypatch.setenv("SUPABASE_URL", "https://supabase.example.com")
+    monkeypatch.setenv("SUPABASE_KEY", "sb_publishable_test")
+    monkeypatch.setenv("SCHEDULE_ORGANIZATION_ID", "mirea")
     monkeypatch.setenv("ADMINS", "111,222")
     monkeypatch.setenv("DB_PATH", "/tmp/test.db")
 
     cfg = Config(
         token=os.getenv("TOKEN"),
-        api_url=os.getenv("API_URL"),
+        supabase_url=os.getenv("SUPABASE_URL"),
+        supabase_key=os.getenv("SUPABASE_KEY"),
+        organization_id=os.getenv("SCHEDULE_ORGANIZATION_ID"),
         admins=parse_admins(os.getenv("ADMINS")),
         db_path=os.getenv("DB_PATH"),
     )
     assert cfg.token == "test_token_123"
-    assert cfg.api_url == "https://schedule-of-mirea.example.com"
+    assert cfg.supabase_url == "https://supabase.example.com"
+    assert cfg.supabase_key == "sb_publishable_test"
+    assert cfg.organization_id == "mirea"
     assert cfg.admins == [111, 222]
     assert cfg.db_path == "/tmp/test.db"
+
+
+def test_config_reads_supabase_settings_from_env(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://supabase.example.com")
+    monkeypatch.setenv("SUPABASE_KEY", "sb_publishable_from_env")
+
+    cfg = Config(
+        supabase_url=os.getenv("SUPABASE_URL"),
+        supabase_key=os.getenv("SUPABASE_KEY"),
+    )
+    assert cfg.supabase_url == "https://supabase.example.com"
+    assert cfg.supabase_key == "sb_publishable_from_env"
+    assert cfg.has_schedule_backend is True
+
+
+def test_config_has_no_embedded_supabase_credentials():
+    cfg = Config()
+    assert not hasattr(cfg, "api_url")
+    # Credentials must come from .env, never from source code.
+    config_source = Path(bot.config.__file__).read_text(encoding="utf-8")
+    assert "sb_publishable_" not in config_source
+    assert "supabase.co" not in config_source
+
+
+def test_has_schedule_backend_requires_both_values():
+    assert Config(supabase_url="https://x", supabase_key="k").has_schedule_backend
+    assert not Config(supabase_url="", supabase_key="k").has_schedule_backend
+    assert not Config(supabase_url="https://x", supabase_key="").has_schedule_backend

@@ -2,10 +2,21 @@ from datetime import date
 
 from bot.api_client import ScheduleApiClient
 from bot.fetch.models import Lesson, LessonSchedule, ScheduleData, SearchItem
+from bot.parse.semester import get_semester_bounds
 
 
-async def get_schedule(target: SearchItem) -> ScheduleData | None:
-    return await ScheduleApiClient().get_schedule(target)
+async def get_schedule(
+    target: SearchItem,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> ScheduleData | None:
+    if date_from is None or date_to is None:
+        term_start, term_end = get_semester_bounds()
+        date_from = date_from or term_start
+        date_to = date_to or term_end
+    return await ScheduleApiClient().get_schedule(
+        target, date_from=date_from, date_to=date_to
+    )
 
 
 def get_lessons(user_data: ScheduleData, dates: list[date] | None = None) -> list[Lesson]:
@@ -21,4 +32,3 @@ def get_lessons(user_data: ScheduleData, dates: list[date] | None = None) -> lis
 
     lessons_list.sort(key=lambda x: (x.dates, x.lesson_bells.number))
     return lessons_list
-

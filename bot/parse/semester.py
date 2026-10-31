@@ -41,6 +41,39 @@ def get_semester_start_date_from_period(target_date: datetime.date | None = None
     )
 
 
+def get_semester_bounds(target_date: datetime.date | None = None) -> tuple[datetime.date, datetime.date]:
+    """Return the (first day, last day) of the term used for ``target_date``.
+
+    Boundaries follow the МИРЭА schedule backend: autumn = September 1 .. January 31,
+    spring = February 1 .. August 31. August belongs to the upcoming autumn term,
+    matching :func:`get_period` and the bot's own week numbering (week 1 starts
+    with the September term).
+    """
+    current_date = target_date if target_date is not None else datetime.date.today()
+    period = get_period(current_date)
+
+    if period.semester == 1:
+        return datetime.date(period.year_start, 9, 1), datetime.date(
+            period.year_end, 1, 31
+        )
+    return datetime.date(period.year_end, 2, 1), datetime.date(
+        period.year_end, 8, 31
+    )
+
+
+def get_term_code(target_date: datetime.date | None = None) -> str:
+    """Human-readable term code, e.g. ``2026-autumn`` / ``2027-spring``.
+
+    The code is prefixed with the calendar year in which the term starts,
+    which is how the backend names its terms (``2026-spring``, ``2026-autumn``).
+    """
+    current_date = target_date if target_date is not None else datetime.date.today()
+    period = get_period(current_date)
+    if period.semester == 1:
+        return f"{period.year_start}-autumn"
+    return f"{period.year_end}-spring"
+
+
 def get_current_week_number() -> int:
     return get_week_by_date(datetime.date.today())
 

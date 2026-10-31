@@ -6,11 +6,46 @@
 
 Проект написан на языке `Python` с использованием библиотеки `aiogram 3.x`
 
-Расписание берется через [API](https://github.com/0niel/university-app/tree/master/api), который предоставляет
-расписание в формате `JSON.`
+Расписание берётся из публичного Supabase-проекта официального приложения МИРЭА
+(`supabase.mirea.ninja`), который наполняется из `schedule-of.mirea.ru`.
+Используются PostgREST RPC:
+
+- `search_schedule_targets` — поиск групп, преподавателей и аудиторий;
+- `get_schedule_for_entity` — расписание выбранной сущности за диапазон дат.
+
+Старый `app-api.mirea.ninja` больше не используется.
+
+Адрес проекта и publishable-ключ Supabase **не хранятся в репозитории**: они
+задаются в локальном `.env` (см. `.env.example`). Без `SUPABASE_URL` и
+`SUPABASE_KEY` бот не стартует и пишет об этом в лог.
 
 Бот находится в стадии активной разработки, поэтому возможны ошибки и недоработки.
 ***
+
+## Проверка бэкенда
+
+Расписание можно запросить напрямую, без бота. Значения берите из своего `.env`:
+
+```bash
+export SUPABASE_URL="https://<project-ref>.supabase.co"
+export SUPABASE_KEY="sb_publishable_<your-key>"
+
+curl --fail-with-body -sS \
+  "$SUPABASE_URL/rest/v1/rpc/get_schedule_for_entity" \
+  -H "apikey: $SUPABASE_KEY" \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+    "p_entity_type": "group",
+    "p_entity": "ИКБО-10-23",
+    "p_organization_id": "mirea",
+    "p_date_from": "2026-10-26",
+    "p_date_to": "2026-11-01"
+  }'
+```
+
+`p_entity` — название сущности (`ИКБО-10-23`) или её числовой `external_id`
+из `search_schedule_targets` (он же `uid` в боте). Пустой массив означает, что
+у сущности нет занятий в этом диапазоне дат.
 
 ## Админские команды
 
@@ -35,7 +70,9 @@
 uv sync
 ```
 
-2. Добавьте файл `.env` в корневую директорию проекта и заполните его по примеру `.env.example`
+2. Добавьте файл `.env` в корневую директорию проекта и заполните его по примеру `.env.example`.
+   Обязательно укажите `TOKEN`, `SUPABASE_URL` и `SUPABASE_KEY` — креды бэкенда
+   расписания в репозитории не лежат.
 3. Запустите приложение:
 
 ```bash

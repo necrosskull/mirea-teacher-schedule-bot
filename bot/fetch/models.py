@@ -4,6 +4,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, Field, field_validator
 
+from bot.logs.lazy_logger import lazy_logger
+
 
 class SearchItem(BaseModel):
     type: str
@@ -12,19 +14,16 @@ class SearchItem(BaseModel):
 
     @field_validator("type")
     def singularize_type(cls, value):
+        value = value.strip().lower()
         return value[:-1] if value.endswith("s") else value
 
 
-class ScheduleEndpoints(enum.Enum):
-    teachers = "teachers"
-    groups = "groups"
-    classrooms = "classrooms"
+class ScheduleTargetType(str, enum.Enum):
+    """Entity kinds accepted by the schedule RPCs (singular, as in the wire API)."""
 
-
-class SearchResults(BaseModel):
-    teachers: list[SearchItem] | None = None
-    groups: list[SearchItem] | None = None
-    classrooms: list[SearchItem] | None = None
+    GROUP = "group"
+    TEACHER = "teacher"
+    CLASSROOM = "classroom"
 
 
 class Campus(BaseModel):
@@ -114,10 +113,54 @@ class Holiday(BaseModel):
     type: str | None = ""
 
 
+class CalendarEvent(BaseModel):
+    """Non-lesson calendar item emitted by the Supabase schedule API.
+
+    The bot does not render these, but they must not break schedule parsing.
+    """
+
+    dates: Dates | None = None
+    title: str | None = ""
+    type: str | None = ""
+    kind: str | None = ""
+    description: str | None = ""
+    location: str | None = ""
+    is_all_day: bool | None = None
+    uid: str | None = ""
+    starts_at: str | None = ""
+    ends_at: str | None = ""
+
 
 class Lesson(LessonSchedule):
     dates: date
 
 
 class ScheduleData(BaseModel):
-    data: list[LessonSchedule | Holiday]
+    data: list[LessonSchedule | Holiday | CalendarEvent] = Field(default_factory=list)
+
+    @classmethod
+    def from_wire(cls, payload: list[dict] | None) -> "ScheduleData":
+        """Build schedule data from the Supabase ``get_schedule_for_entity`` array.
+
+        The RPC returns a mixed array of ``__lesson_schedule__``, ``__holiday__``
+        and ``__calendar_event__`` items; each kind is parsed explicitly so an
+        unexpected item cannot be silently mistaken for a lesson.
+        """
+        items: list[LessonSchedule | Holiday | CalendarEvent] = []
+        for raw in payload or []:
+            item_type = raw.get("type")
+            try:
+                if item_type == "__holiday__":
+                    items.append(Holiday(**raw))
+                elif item_type == "__calendar_event__":
+                    items.append(CalendarEvent(**raw))
+                elif item_type == "__lesson_schedule__" or "lesson_bells" in raw:
+                    items.append(LessonSchedule(**raw))
+                # else: unknown future item kinds are ignored instead of
+                # failing the whole schedule.
+            except Exception as error:  # noqa: BLE001 - one bad item must not break the schedule
+                lazy_logger.logger.warning(
+                    f"ScheduleData.from_wire skipped malformed {item_type!r} item: {error}"
+                )
+                continue
+        return cls(data=items)

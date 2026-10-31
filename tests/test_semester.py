@@ -6,8 +6,10 @@ from bot.parse.semester import (
     get_date,
     get_dates_for_week,
     get_period,
+    get_semester_bounds,
     get_semester_start_date,
     get_semester_start_date_from_period,
+    get_term_code,
     get_week_and_weekday,
     get_week_by_date,
 )
@@ -116,3 +118,27 @@ def test_get_current_week_number():
     curr_week = get_current_week_number()
     assert isinstance(curr_week, int)
     assert curr_week >= 1
+
+
+def test_get_semester_bounds_autumn():
+    assert get_semester_bounds(date(2026, 9, 1)) == (date(2026, 9, 1), date(2027, 1, 31))
+    assert get_semester_bounds(date(2026, 10, 31)) == (date(2026, 9, 1), date(2027, 1, 31))
+    assert get_semester_bounds(date(2027, 1, 31)) == (date(2026, 9, 1), date(2027, 1, 31))
+
+
+def test_get_semester_bounds_spring():
+    assert get_semester_bounds(date(2027, 2, 1)) == (date(2027, 2, 1), date(2027, 8, 31))
+    assert get_semester_bounds(date(2027, 5, 15)) == (date(2027, 2, 1), date(2027, 8, 31))
+    assert get_semester_bounds(date(2027, 7, 31)) == (date(2027, 2, 1), date(2027, 8, 31))
+
+
+def test_get_semester_bounds_august_belongs_to_autumn():
+    # August has no study weeks, so the bot resolves it to the upcoming term.
+    assert get_semester_bounds(date(2027, 8, 31)) == (date(2027, 9, 1), date(2028, 1, 31))
+
+
+def test_get_term_code():
+    assert get_term_code(date(2026, 10, 31)) == "2026-autumn"
+    assert get_term_code(date(2027, 1, 31)) == "2026-autumn"
+    assert get_term_code(date(2027, 2, 1)) == "2027-spring"
+    assert get_term_code(date(2027, 6, 1)) == "2027-spring"

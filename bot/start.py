@@ -30,6 +30,12 @@ async def run() -> None:
     from bot import setup
     from bot.handlers.notification import notification_worker
 
+    if not settings.has_schedule_backend:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_KEY are not set. "
+            "Copy .env.example to .env and fill in the schedule backend settings."
+        )
+
     bot = Bot(
         token=settings.token,
         default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),

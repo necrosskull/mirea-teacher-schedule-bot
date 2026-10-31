@@ -1,11 +1,13 @@
-from datetime import date
+from datetime import date, timedelta
 import json
 import time
+from typing import Any
 
 from bot.api_client import ScheduleApiClient
 from bot.config import settings
 from bot.fetch.models import Lesson, LessonSchedule, ScheduleData, SearchItem
 from bot.logs.lazy_logger import lazy_logger
+from bot.parse.semester import get_semester_bounds, get_term_code
 from bot.repository.schedule_cache_repository import ScheduleCacheRepository
 from bot.repository.user_repository import UserRepository
 
@@ -35,9 +37,9 @@ class ScheduleService:
         self._memory_ttl = (
             memory_ttl if memory_ttl is not None else settings.memory_cache_ttl_seconds
         )
-        self._memory_cache: dict[str, tuple[float, any]] = {}
+        self._memory_cache: dict[str, tuple[float, Any]] = {}
 
-    def _get_from_memory(self, cache_key: str) -> any | None:
+    def _get_from_memory(self, cache_key: str) -> Any | None:
         if cache_key in self._memory_cache:
             expire_ts, data = self._memory_cache[cache_key]
             if time.monotonic() < expire_ts:
@@ -46,7 +48,7 @@ class ScheduleService:
         return None
 
     def _save_to_memory(
-        self, cache_key: str, data: any, ttl_seconds: int | None = None
+        self, cache_key: str, data: Any, ttl_seconds: int | None = None
     ) -> None:
         ttl = ttl_seconds if ttl_seconds is not None else self._memory_ttl
         self._memory_cache[cache_key] = (time.monotonic() + ttl, data)
@@ -102,7 +104,20 @@ class ScheduleService:
 
         return None
 
-    async def get_schedule(self, item: SearchItem) -> ScheduleData | None:
+    def _schedule_window(self, target_date: date | None = None) -> tuple[date, date]:
+        """Date range requested from the schedule backend for one term.
+
+        The bot is week-oriented and derives week numbers from the term start,
+        so the whole current term is fetched once and cached. A small lookahead
+        keeps "tomorrow" notifications working across a term boundary.
+        """
+        term_start, term_end = get_semester_bounds(target_date)
+        lookahead = max(0, settings.schedule_lookahead_days)
+        return term_start, term_end + timedelta(days=lookahead)
+
+    async def get_schedule(
+        self, item: SearchItem, target_date: date | None = None
+    ) -> ScheduleData | None:
         if self._user_repo and item.name:
             try:
                 await self._user_repo.record_item_request(
@@ -111,7 +126,8 @@ class ScheduleService:
             except Exception:
                 pass
 
-        cache_key = f"schedule:{item.type}:{item.uid}"
+        date_from, date_to = self._schedule_window(target_date)
+        cache_key = f"schedule:{item.type}:{item.uid}:{get_term_code(target_date)}"
 
         # 1. Check L1 Memory Cache
         mem_data = self._get_from_memory(cache_key)
@@ -134,7 +150,9 @@ class ScheduleService:
                     )
 
         # 3. Live API request
-        schedule = await self._api_client.get_schedule(item)
+        schedule = await self._api_client.get_schedule(
+            item, date_from=date_from, date_to=date_to
+        )
         if schedule is not None:
             self._save_to_memory(cache_key, schedule)
             if self._cache_repo:

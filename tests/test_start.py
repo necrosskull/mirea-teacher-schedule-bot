@@ -9,6 +9,8 @@ from bot.start import main, run
 @pytest.mark.asyncio
 async def test_run_bot(monkeypatch, temp_db):
     monkeypatch.setattr(settings, "token", "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11")
+    monkeypatch.setattr(settings, "supabase_url", "https://supabase.example.com")
+    monkeypatch.setattr(settings, "supabase_key", "sb_publishable_test")
 
     with (
         patch("bot.setup.setup", AsyncMock()),
@@ -22,9 +24,16 @@ async def test_run_bot(monkeypatch, temp_db):
         mock_serve.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_run_requires_schedule_backend(monkeypatch):
+    monkeypatch.setattr(settings, "supabase_url", "")
+    monkeypatch.setattr(settings, "supabase_key", "")
+
+    with pytest.raises(RuntimeError, match="SUPABASE_URL"):
+        await run()
+
 
 def test_main_bot(monkeypatch):
     with patch("bot.start.run", AsyncMock()) as mock_run:
         main()
         mock_run.assert_called_once()
-
